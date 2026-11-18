@@ -37,9 +37,30 @@ describe('sales data storage', () => {
   it('rejects invalid writes without replacing saved data', () => {
     const dataset = loadSalesDataset(storage)
     const saved = values.get(SALES_STORAGE_KEY)
-    dataset.orders[0].lines[0].unitPriceCents = 0
+    dataset.orders[0]!.lines[0]!.unitPriceCents = 0
     expect(() => saveSalesDataset(dataset, storage)).toThrow('Invalid sales dataset')
     expect(values.get(SALES_STORAGE_KEY)).toBe(saved)
+  })
+
+  it('rejects an order dated before its sales location opened', () => {
+    const dataset = createDemoSales()
+    const order = dataset.orders.find(candidate => candidate.locationId !== 'online')!
+    const location = dataset.locations.find(candidate => candidate.id === order.locationId)!
+    const nextDay = new Date(Date.parse(`${order.date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
+    location.openedOn = nextDay
+    expect(() => saveSalesDataset(dataset, storage)).toThrow('Invalid sales dataset')
+    values.set(SALES_STORAGE_KEY, JSON.stringify({ version: 1, dataset }))
+    expect(() => loadSalesDataset(storage)).toThrow('invalid format')
+  })
+
+  it('rejects quantities whose cent totals cannot be represented exactly', () => {
+    const dataset = createDemoSales()
+    const line = dataset.orders[0]!.lines[0]!
+    line.quantity = Math.floor(Number.MAX_SAFE_INTEGER / line.unitPriceCents) + 1
+    expect(Number.isSafeInteger(line.quantity)).toBe(true)
+    expect(() => saveSalesDataset(dataset, storage)).toThrow('Invalid sales dataset')
+    values.set(SALES_STORAGE_KEY, JSON.stringify({ version: 1, dataset }))
+    expect(() => loadSalesDataset(storage)).toThrow('invalid format')
   })
 
   it('propagates browser storage read and write failures', () => {

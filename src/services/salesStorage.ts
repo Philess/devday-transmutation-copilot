@@ -1,5 +1,6 @@
 import { createDemoSales } from '../data/sales'
 import type { SalesDataset } from '../types/sales'
+import { isRepresentableOrder } from './money'
 
 export const SALES_STORAGE_KEY = 'central-alchemy-supply.sales.v1'
 
@@ -36,7 +37,7 @@ const isSalesDataset = (value: unknown): value is SalesDataset => {
     products.set(product.id, { name: product.name, category: product.category })
   }
 
-  const locations = new Map<string, { channel: string; region: string }>()
+  const locations = new Map<string, { channel: string; region: string; openedOn: string }>()
   for (const location of value.locations) {
     if (typeof location !== 'object' || location === null || !('id' in location) || typeof location.id !== 'string'
       || !location.id || !('name' in location) || typeof location.name !== 'string' || !location.name.trim()
@@ -44,7 +45,7 @@ const isSalesDataset = (value: unknown): value is SalesDataset => {
       || !('region' in location) || typeof location.region !== 'string'
       || !('openedOn' in location) || !isDate(location.openedOn)
       || locations.has(location.id)) return false
-    locations.set(location.id, { channel: location.channel, region: location.region })
+    locations.set(location.id, { channel: location.channel, region: location.region, openedOn: location.openedOn })
   }
 
   const customers = new Map<string, { homeStoreId: string; joinedOn: string }>()
@@ -78,7 +79,7 @@ const isSalesDataset = (value: unknown): value is SalesDataset => {
       || !('locationId' in order) || typeof order.locationId !== 'string' || !locations.has(order.locationId)
       || locations.get(order.locationId)!.openedOn > order.date
       || !('eventIds' in order) || !Array.isArray(order.eventIds)
-      || order.eventIds.some(eventId => typeof eventId !== 'string' || !events.has(eventId)
+      || order.eventIds.some((eventId: unknown) => typeof eventId !== 'string' || !events.has(eventId)
         || events.get(eventId)!.startDate > order.date || events.get(eventId)!.endDate < order.date)
       || !('lines' in order) || !Array.isArray(order.lines) || order.lines.length === 0) return false
     orderIds.add(order.id)
@@ -97,6 +98,11 @@ const isSalesDataset = (value: unknown): value is SalesDataset => {
         || !('promotionCode' in line) || !(line.promotionCode === null || typeof line.promotionCode === 'string')) return false
       lineProductIds.add(line.product.id)
     }
+    if (!isRepresentableOrder(order.lines)
+      || !isRepresentableOrder(order.lines.map((line: { quantity: number; listUnitPriceCents: number }) => ({
+        quantity: line.quantity,
+        unitPriceCents: line.listUnitPriceCents
+      })))) return false
   }
 
   return true

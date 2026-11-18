@@ -31,9 +31,12 @@ Vite affiche l’adresse locale, par défaut `http://localhost:3001`.
 
 ```sh
 npm test
+npm run type-check
 npm run build
 npm run data:check
 ```
+
+`npm run type-check` et `npm run build` contrôlent le projet applicatif `tsconfig.app.json`.
 
 `npm run data:generate` régénère de façon déterministe le jeu de données fictif de `src/data/sales.json`.
 
@@ -43,4 +46,4 @@ npm run data:check
 - `central-alchemy-supply.sales.v1` : données de ventes initiales et commandes simulées.
 - `central-alchemy-supply.cart.v1` : panier.
 
-Une erreur de lecture, de validation ou d’écriture est affichée; les données invalides ne sont pas remplacées silencieusement. Réinitialiser les données de démonstration n’efface que les clés propres à cette application.
+Une erreur de lecture, de validation ou d’écriture est affichée; les données invalides ne sont pas remplacées silencieusement. Les quantités et montants dont le total en cents dépasse la précision entière exacte sont refusés. Réinitialiser les données de démonstration n’efface que les clés propres à cette application.

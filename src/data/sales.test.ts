@@ -42,8 +42,8 @@ describe('fictional two-year sales fixture', () => {
         expect(data.orders.filter(order => order.date.startsWith(monthKey)).length, monthKey).toBeGreaterThan(10)
       }
     }
-    expect(data.orders[0].date).toBe('2024-01-01')
-    expect(data.orders.at(-1)?.date).toBe('2025-12-31')
+    expect(data.orders[0]?.date).toBe('2024-01-01')
+    expect(data.orders[data.orders.length - 1]?.date).toBe('2025-12-31')
   })
 
   it('maintains valid customer, location, product and event references with historical cent prices', () => {
@@ -152,12 +152,12 @@ describe('fictional two-year sales fixture', () => {
 
   it('returns independent deep copies of the bundled fixture', () => {
     const copy = createDemoSales()
-    copy.products[0].name = 'Modified'
-    copy.products[0].themes.push('modified')
-    copy.orders[0].lines[0].quantity = 999
-    copy.orders[0].eventIds.push('modified')
-    copy.customers[0].region = 'Modified'
-    copy.locations[0].name = 'Modified'
+    copy.products[0]!.name = 'Modified'
+    copy.products[0]!.themes.push('modified')
+    copy.orders[0]!.lines[0]!.quantity = 999
+    copy.orders[0]!.eventIds.push('modified')
+    copy.customers[0]!.region = 'Modified'
+    copy.locations[0]!.name = 'Modified'
     expect(createDemoSales()).toEqual(data)
   })
 })

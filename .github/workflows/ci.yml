@@ -18,4 +18,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run type-check
+      - run: npm run data:check
       - run: npm run build

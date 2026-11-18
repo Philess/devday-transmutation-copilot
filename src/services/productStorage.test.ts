@@ -22,7 +22,7 @@ describe('product storage', () => {
 
   it('preserves saved edits on subsequent loads', () => {
     const products = createDemoProducts().slice(0, 1)
-    products[0].name = 'Workshop edit'
+    products[0]!.name = 'Workshop edit'
     saveProducts(products, storage)
     expect(loadProducts(storage)).toEqual(products)
     expect(loadProducts(storage)).toEqual(products)
@@ -53,7 +53,7 @@ describe('product storage', () => {
   it('rejects invalid writes without replacing saved data', () => {
     const products = loadProducts(storage)
     const saved = values.get(PRODUCT_STORAGE_KEY)
-    products[0].priceCents = 1.2
+    products[0]!.priceCents = 1.2
     expect(() => saveProducts(products, storage)).toThrow('Invalid product collection')
     expect(values.get(PRODUCT_STORAGE_KEY)).toBe(saved)
   })

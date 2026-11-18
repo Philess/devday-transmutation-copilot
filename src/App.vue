@@ -6,6 +6,7 @@ import type { CartItem } from './services/cartStorage'
 import { loadCart, saveCart } from './services/cartStorage'
 import { loadProducts, resetProducts } from './services/productStorage'
 import { filterProducts } from './services/productSearch'
+import { orderTotalCents } from './services/money'
 import { loadSalesDataset, resetSalesDataset, saveSalesDataset } from './services/salesStorage'
 import type { Product } from './types/product'
 import type { SalesDataset, SalesOrder } from './types/sales'
@@ -29,10 +30,10 @@ const cartEntries = computed(() => cart.value.map(item => ({
   ...item,
   product: products.value.find(product => product.id === item.productId)
 })).filter(entry => entry.product))
-const cartTotalCents = computed(() => cartEntries.value.reduce(
-  (sum, entry) => sum + entry.product!.priceCents * entry.quantity,
-  0
-))
+const cartTotalCents = computed(() => orderTotalCents(cartEntries.value.map(entry => ({
+  quantity: entry.quantity,
+  unitPriceCents: entry.product!.priceCents
+}))))
 const physicalLocations = computed(() => sales.value?.locations.filter(location => location.channel === 'store') ?? [])
 const formatUSD = (cents: number): string =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
@@ -43,6 +44,12 @@ const showError = (context: string, reason: unknown): void => {
   error.value = `${context} ${detail}`
 }
 
+const cartLines = (items: CartItem[], catalog: Product[]) => items.map(item => {
+  const product = catalog.find(candidate => candidate.id === item.productId)
+  if (!product) throw new Error('Le panier enregistré contient un produit absent du catalogue.')
+  return { quantity: item.quantity, unitPriceCents: product.priceCents }
+})
+
 const loadShop = (): void => {
   loading.value = true
   error.value = null
@@ -51,10 +58,7 @@ const loadShop = (): void => {
     const savedProducts = loadProducts()
     const savedSales = loadSalesDataset()
     const savedCart = loadCart()
-    for (const item of savedCart) {
-      const product = savedProducts.find(candidate => candidate.id === item.productId)
-      if (!product) throw new Error('Le panier enregistré contient un produit absent du catalogue.')
-    }
+    orderTotalCents(cartLines(savedCart, savedProducts))
     products.value = savedProducts
     sales.value = savedSales
     cart.value = savedCart
@@ -70,6 +74,7 @@ const loadShop = (): void => {
 
 const persistCart = (nextCart: CartItem[]): boolean => {
   try {
+    orderTotalCents(cartLines(nextCart, products.value))
     saveCart(nextCart)
     cart.value = nextCart
     error.value = null
@@ -130,6 +135,12 @@ const completeOrder = (): void => {
     error.value = 'Choisissez un point de vente disponible.'
     return
   }
+  try {
+    orderTotalCents(cartLines(cart.value, products.value))
+  } catch (reason) {
+    showError('Impossible de valider le montant de la commande.', reason)
+    return
+  }
 
   const date = new Date().toISOString().slice(0, 10)
   const orderNumber = sales.value.orders.length + 1
@@ -145,7 +156,7 @@ const completeOrder = (): void => {
     region: customerLocation.region,
     homeStoreId: customerLocation.id,
     joinedOn: date,
-    preferredCategory: cartEntries.value[0].product!.category,
+    preferredCategory: cartEntries.value[0]?.product?.category ?? '',
     preferredChannel: location.channel
   }
   const order: SalesOrder & { eventIds: string[] } = {
