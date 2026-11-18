@@ -1,102 +1,46 @@
-# Workshop — Du besoin métier au dashboard avec Copilot App
+# Central Alchemy Supply
 
-Vous gérez une boutique d'albums de musique. Vous disposez de deux années de données de vente, mais l'espace administrateur les affiche uniquement sous forme de données brutes.
+Central Alchemy Supply est une boutique de démonstration Vue 3 / TypeScript et le point de départ d’un atelier de développement agentique. Le dashboard de ventes est à construire par les participants pendant la session : ce projet fournit la boutique et les données locales, pas une analyse prête à l’emploi.
 
-**Votre mission :** utiliser GitHub Copilot dans Copilot App pour transformer ces données en un dashboard utile, puis préparer une présentation PowerPoint de vos analyses.
+## Contenu
 
-## Avant de commencer
+- Catalogue fictif de 30 produits, illustré par des SVG locaux.
+- Recherche et filtres de catégorie, fiches d’inventaire et panier.
+- Parcours de commande simulé, sans paiement réel, adresse ni service externe.
+- Registre consultable des collections brutes : catalogue, points de vente, clients pseudonymisés, périodes de démonstration et commandes.
+- Données de ventes initiales du 1er janvier 2024 au 31 décembre 2025, en USD; les prix des lignes sont des entiers en cents et conservent le prix historique payé.
 
-- Disposer de Copilot App, avec GitHub Copilot connecté et utilisable.
-- Installer [Node.js 22 ou supérieur](https://nodejs.org/) ; npm est inclus.
-- Récupérer ce dépôt et ouvrir son dossier dans Copilot App.
-- Ouvrir le [transcript de réunion fictif](transcript-reunion-dashboard.txt) inclus dans le dépôt.
+Catégories : Ouvrages et recherches; Composants alchimiques; Équipements de laboratoire; Automails et pièces mécaniques; Équipements d’alchimistes d’État; Artefacts rares; Matériel d’exploration; Consommables.
 
-L'application fonctionne en local, sans backend ni service cloud. Les données sont fictives et les visuels sont inclus dans le projet. Une connexion Internet est nécessaire pour installer les dépendances et utiliser Copilot.
+Points de vente : Central Command Supply Office, East City Alchemy Store, South City Workshop, Resembool Mechanics Depot, Briggs Northern Outpost, Dublith Requisition Hall, Liore Research Exchange, East Command Annex, Fort Bastion Material Desk, North Valley Field Station et le canal distinct Online Requisition Portal.
 
-## Découverte — Lancer l'application avec un prompt
+La boutique et les données fonctionnent entièrement dans le navigateur. Les clés versionnées de produits, ventes et panier sont distinctes; les anciennes données du navigateur sont laissées intactes. Les commandes de démonstration ajoutées ensuite sont datées en UTC et enregistrées localement. Les données sont fictives et ne contiennent ni coût ni marge.
 
-Dans Copilot App, demandez simplement :
+## Démarrer
 
-> Lance cette application en local. Installe les dépendances si nécessaire, démarre le serveur de développement et donne-moi l'adresse à ouvrir dans mon navigateur.
+Prérequis : Node.js 22 ou supérieur et npm.
 
-Ouvrez l'adresse indiquée, normalement **http://localhost:3001**, puis :
+```sh
+npm ci
+npm run dev
+```
 
-1. Parcourez la boutique et ses albums.
-2. Cliquez sur **Admin login** pour ouvrir l'espace administrateur.
-3. Explorez les collections avec **Data collection** et les boutons **Previous / Next**.
+Vite affiche l’adresse locale, par défaut `http://localhost:3001`.
 
-Vous pouvez consulter les albums, les magasins et la boutique en ligne, les clients fictifs, les événements saisonniers et les commandes. Le jeu de données couvre **2024 et 2025** : 30 albums, 10 magasins physiques, une boutique en ligne, 600 clients et 9 937 commandes.
+## Vérification
 
-Le mode administrateur est une simulation : aucun identifiant n'est demandé. **Logout** permet de revenir à la boutique.
+```sh
+npm test
+npm run build
+npm run data:check
+```
 
-*Capture à ajouter : l'application et les données brutes en mode administrateur.*
+`npm run data:generate` régénère de façon déterministe le jeu de données fictif de `src/data/sales.json`.
 
-## Étape 1 — Construire votre dashboard de ventes
+## Stockage local
 
-### Partir du besoin métier
+- `central-alchemy-supply.products.v1` : catalogue initial et disponibilité de démonstration.
+- `central-alchemy-supply.sales.v1` : données de ventes initiales et commandes simulées.
+- `central-alchemy-supply.cart.v1` : panier.
 
-Le [transcript de réunion fictif](transcript-reunion-dashboard.txt) contient le contexte et les attentes métier. **Il remplace l'accès à Work IQ pour cet exercice.** Référencez ce fichier dans votre conversation dans Copilot App ou joignez-le.
-
-Commencez, par exemple, avec ce prompt, **en mode plan**, en référençant le fichier fourni :
-
-> Lis le transcript de réunion joint et explore les données de vente du projet. Résume les besoins métier, identifie les indicateurs que les données permettent de calculer et propose une première version simple du dashboard. Signale les demandes auxquelles les données ne permettent pas de répondre. Ne modifie pas encore le code.
-
-Réponsez aux questions, et prenez le temps de revoir et ajuster le plan. Puis demandez à Copilot de passer à l'action :
-
-> Implémente ce dashboard dans l'espace administrateur, en t'appuyant sur les besoins du transcript et les données existantes. Garde l'application en Vue 3 / TypeScript, entièrement frontend et locale, et préserve la boutique. Vérifie les calculs, puis exécute les tests et le build.
-
-### Explorer et améliorer
-
-Testez le résultat dans le navigateur et faites évoluer votre dashboard avec vos propres prompts. Quelques pistes, à adapter au transcript :
-
-- Suivre les ventes, le nombre de commandes et le panier moyen.
-- Comparer les magasins physiques et la boutique en ligne.
-- Identifier les albums les plus vendus et l'évolution mensuelle des ventes.
-- Explorer la saisonnalité et les lancements d'albums.
-- Filtrer les résultats par période, canal ou magasin.
-
-**Vérifiez les chiffres, pas seulement le rendu.** Les montants des lignes de commande sont en centimes USD : les ventes se calculent avec la quantité multipliée par le prix unitaire historique. Les données ne permettent pas de calculer une marge et une corrélation saisonnière ne prouve pas une causalité.
-
-**Résultat attendu :** un dashboard fonctionnel qui répond aux principales questions de la réunion, avec des chiffres vérifiés et quelques enseignements que vous pouvez expliquer.
-
-
-
-## Étape 2 — Générer une présentation PowerPoint
-
-Vous allez maintenant utiliser le skill PowerPoint **`pptx` d'Anthropic** pour présenter vos résultats.
-
-### Installer le skill dans Copilot App
-
-1. Ouvrez la section Customize dans Copilot App. C'est ici que vous pourrez installer, et activer les skills, MCP Servers, plugins et autres extensions pour Copilot.
-![Copilot app customize section](assets/001-customize.png)
-2. Dans les apps installées, recherchez la section des plugins et cliquez sur `Add Plugin` puis `Manage Markeplace`.
-![Add a marketplace](assets/002-add-marketplace.png)
-Un marketplace est un catalogue permettant de distribuer des plugins et des skills pour Copilot. Vous pouvez construire vos propres catalogues d'entreprise ou utiliser ceux proposés par la communauté.
-3. Nous allons ajouter le marketplace **Anthropics Skills** proposé par Anthropic.
-Dans le champ **Source** saisissez la valeur `anthropics/skills` et cliquez sur **Add**
-![add anthropics skills marketplace](assets/003-anthropic-repo.png)
-4. De retour sur l'écran des plugins, recherchez le skill qui nous intéresse: **`document-skills`**, puis installez-le.
-![browse plugins](assets/004-browse-plugins.png)
-![add document plugin](assets/005-add-document-plugin.png)
-
-
-### Préparer votre restitution
-
-Dans Copilot App, demandez par exemple :
-
-> Utilise le skill pptx d'Anthropic pour créer un document PowerPoint de 5 diapositives pour faire une présentation exécutive des nouvelles fonctionnalités. Utilise le transcript et les données des sessions copilot sur ce projet. Les 4 premiers slides doivent couvrir le contexte, les objectifs, les nouvelles fonctionnalités et les impacts attendus et le dernier slide doit doit être un rapport visuel du cout, des sessions, des modèles et de la consommation de tokens des sessions qui ont été nécessaires. Utilise le MCP Playwright pour ajouter des captures d'écran. Enregistre le fichier .pptx dans le projet et indique son emplacement.
-
-Ouvrez le fichier généré, vérifiez le contenu et la lisibilité des diapositives, puis demandez les ajustements nécessaires à Copilot.
-
-**Résultat attendu :** une présentation PowerPoint courte et exploitable pour restituer vos conclusions.
-
-
-## Repères utiles
-
-- [Données de vente](src/data/sales.json) et [contrats TypeScript](src/types/sales.ts).
-- [Vue administrateur à faire évoluer](src/components/AdminDataView.vue).
-- [Service de persistance des albums](src/services/albumStorage.ts) et [contrat Album](src/types/album.ts) à réutiliser si nécessaire. Préservez les données localStorage existantes et affichez explicitement les erreurs de lecture, de validation ou d'écriture.
-
-Pour un lancement manuel : `npm ci`, puis `npm run dev`. Après vos modifications : `npm test` et `npm run build`.
-
-Application adaptée du frontend Vue de [Philess/gh-copilot-demo](https://github.com/Philess/gh-copilot-demo).
+Une erreur de lecture, de validation ou d’écriture est affichée; les données invalides ne sont pas remplacées silencieusement. Réinitialiser les données de démonstration n’efface que les clés propres à cette application.

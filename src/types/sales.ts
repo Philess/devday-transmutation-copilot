@@ -1,4 +1,4 @@
-import type { Album } from './album'
+import type { Product } from './product'
 
 export type SalesChannel = 'online' | 'store'
 
@@ -11,12 +11,18 @@ export interface SalesLocation {
 export interface Customer {
   id: string
   region: string
+  homeStoreId: string
+  joinedOn: string
+  preferredCategory: string
+  preferredChannel: SalesChannel
 }
 
 export interface OrderLine {
-  product: Pick<Album, 'id' | 'title' | 'artist'>
+  product: Pick<Product, 'id' | 'name' | 'category'>
   quantity: number
+  listUnitPriceCents: number
   unitPriceCents: number
+  promotionCode: string | null
 }
 
 export interface SalesOrder {
@@ -28,6 +34,7 @@ export interface SalesOrder {
 }
 
 export interface SalesData {
+  products: Product[]
   locations: SalesLocation[]
   customers: Customer[]
   orders: SalesOrder[]
@@ -43,35 +50,17 @@ export interface SalesDataset extends SalesData {
     currency: string
     timezone: string
     description: string
-    model: {
-      seasonalDemand: string
-      launchWindowDays: number
-      launchDemandMultiplier: number
-      weekendDemandMultiplier: number
-      secondYearDemandMultiplier: number
-      onlineOrderProbabilityByYear: Record<string, number>
-      limitations: string
-    }
+    limitations: string
   }
-  albums: (Album & {
-    genre: string
-    tags: string[]
-    releaseDate: string
-    saleStartDate: string
-  })[]
+  products: Product[]
   locations: (SalesLocation & { region: string; openedOn: string })[]
-  customers: (Customer & {
-    homeStoreId: string
-    joinedOn: string
-    preferredGenre: string
-    preferredChannel: SalesChannel
-  })[]
+  customers: Customer[]
   events: {
     id: string
     name: string
     startDate: string
     endDate: string
-    albumTag: string
+    theme: string
     demandMultiplier: number
   }[]
   orders: (SalesOrder & { eventIds: string[] })[]

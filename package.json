@@ -1,8 +1,8 @@
 {
-  "name": "exec-agenticdev-worskhop",
+  "name": "devday-transmutation-copilot",
   "version": "1.0.0",
   "private": true,
-  "description": "Frontend-only Vue album collection starter for an agentic development workshop",
+  "description": "Frontend-only Vue storefront and local fictional sales dataset for an agentic development workshop",
   "engines": {
     "node": ">=22"
   },
