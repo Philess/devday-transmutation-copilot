@@ -1,68 +1,71 @@
 import { describe, expect, it } from 'vitest'
-import { createDemoProducts } from './products'
-import { createDemoSales } from './sales'
+import { createDemoAlbums } from './albums'
+import { createDemoSales, DEMO_END_DATE, DEMO_START_DATE } from './sales'
 
 const data = createDemoSales()
 const days = (start: string, end: string) => (Date.parse(end) - Date.parse(start)) / 86400000 + 1
 
-describe('fictional two-year sales fixture', () => {
-  it('provides a complete local catalog with stable, usable product records', () => {
-    expect(data.products.length).toBeGreaterThanOrEqual(24)
-    expect(data.products).toEqual(createDemoProducts())
-    expect(new Set(data.products.map(product => product.id)).size).toBe(data.products.length)
-    expect(new Set(data.products.map(product => product.category).filter(Boolean)).size).toBeGreaterThanOrEqual(6)
-    for (const product of data.products) {
-      expect(product.id).toBeGreaterThan(0)
-      expect(product.name.trim()).not.toBe('')
-      expect(product.category.trim()).not.toBe('')
-      expect(Number.isSafeInteger(product.priceCents)).toBe(true)
-      expect(product.priceCents).toBeGreaterThan(0)
-      expect(product.illustration).toMatch(/^illustrations\/.+\.svg$/)
-      expect(product.imageAlt.trim()).not.toBe('')
-    }
-  })
-
-  it('covers every month in 2024 and 2025 with distinct physical and online locations', () => {
+describe('two-year sales dataset', () => {
+  it('covers two complete calendar years with ten physical stores and one online shop', () => {
     expect(data.metadata).toMatchObject({
       schemaVersion: 1, fictional: true, currency: 'USD', timezone: 'UTC',
       startDate: '2024-01-01', endDate: '2025-12-31'
     })
     expect(data.locations.filter(location => location.channel === 'store')).toHaveLength(10)
-    expect(data.locations.filter(location => location.channel === 'online')).toMatchObject([
-      { id: 'online', name: 'Online Requisition Portal' }
-    ])
+    expect(data.locations.filter(location => location.channel === 'online')).toHaveLength(1)
     expect(data.customers).toHaveLength(600)
+    expect(data.albums).toHaveLength(30)
+    expect(data.orders).toHaveLength(9937)
     expect(data.events).toHaveLength(10)
-    for (const entities of [data.customers, data.locations, data.products, data.orders, data.events]) {
+    for (const entities of [data.customers, data.locations, data.albums, data.orders, data.events]) {
       expect(new Set(entities.map(entity => entity.id)).size).toBe(entities.length)
     }
+    const dates = [...new Set(data.orders.map(order => order.date))].sort()
+    expect(dates).toHaveLength(731)
+    expect(dates[0]).toBe(DEMO_START_DATE)
+    expect(dates[dates.length - 1]).toBe(DEMO_END_DATE)
+    expect(dates).toContain('2024-02-29')
     for (const year of ['2024', '2025']) {
       for (let month = 1; month <= 12; month++) {
-        const monthKey = `${year}-${String(month).padStart(2, '0')}`
-        expect(data.orders.filter(order => order.date.startsWith(monthKey)).length, monthKey).toBeGreaterThan(10)
+        const prefix = `${year}-${String(month).padStart(2, '0')}`
+        const soldAt = new Set(data.orders.filter(order => order.date.startsWith(prefix)).map(order => order.locationId))
+        expect(soldAt.size).toBe(11)
       }
     }
-    expect(data.orders[0]?.date).toBe('2024-01-01')
-    expect(data.orders[data.orders.length - 1]?.date).toBe('2025-12-31')
   })
 
-  it('maintains valid customer, location, product and event references with historical cent prices', () => {
+  it('keeps most albums on sale from the start and introduces eight later launches', () => {
+    expect(data.albums.filter(album => album.saleStartDate <= DEMO_START_DATE)).toHaveLength(22)
+    const launches = data.albums.filter(album => album.saleStartDate > DEMO_START_DATE)
+    expect(launches).toHaveLength(8)
+    for (const year of ['2024', '2025']) {
+      expect(launches.filter(album => album.saleStartDate.startsWith(year))).toHaveLength(4)
+    }
+    for (const album of data.albums) {
+      expect(album.releaseDate <= album.saleStartDate).toBe(true)
+      const purchases = data.orders.filter(order => order.lines.some(line => line.product.id === album.id))
+      expect(purchases.length).toBeGreaterThan(0)
+      expect(purchases.every(order => order.date >= album.saleStartDate)).toBe(true)
+      expect(album.image_url).toBe('/album-cover.svg')
+    }
+    for (const album of createDemoAlbums()) {
+      const historical = data.albums.find(item => item.id === album.id)
+      expect(historical).toMatchObject({ id: album.id, title: album.title, artist: album.artist, price: album.price })
+    }
+  })
+
+  it('has valid customer, store, product and event joins and integer monetary amounts', () => {
     const customers = new Map(data.customers.map(customer => [customer.id, customer]))
     const locations = new Map(data.locations.map(location => [location.id, location]))
-    const products = new Map(data.products.map(product => [product.id, product]))
-    const soldProducts = new Set<number>()
-    const orderIds = new Set<string>()
-    const lineIds = new Set<string>()
-
+    const albums = new Map(data.albums.map(album => [album.id, album]))
     for (const customer of data.customers) {
       const home = locations.get(customer.homeStoreId)
       expect(home).toMatchObject({ channel: 'store', region: customer.region })
-      expect(customer.joinedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(customer.joinedOn <= DEMO_END_DATE).toBe(true)
     }
     for (const order of data.orders) {
-      expect(orderIds.has(order.id)).toBe(false)
-      orderIds.add(order.id)
-      expect(new Date(`${order.date}T00:00:00Z`).toISOString().slice(0, 10)).toBe(order.date)
+      expect(order.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(new Date(order.date).toISOString().slice(0, 10)).toBe(order.date)
       const customer = customers.get(order.customerId)
       const location = locations.get(order.locationId)
       expect(customer).toBeDefined()
@@ -74,90 +77,73 @@ describe('fictional two-year sales fixture', () => {
       expect(order.eventIds).toEqual(data.events
         .filter(event => event.startDate <= order.date && event.endDate >= order.date)
         .map(event => event.id))
-
       for (const line of order.lines) {
-        const product = products.get(line.product.id)
-        expect(product).toMatchObject({ name: line.product.name, category: line.product.category })
-        expect(order.date >= product!.saleStartDate).toBe(true)
+        const album = albums.get(line.product.id)
+        expect(album).toMatchObject(line.product)
         expect(Number.isSafeInteger(line.quantity)).toBe(true)
         expect(line.quantity).toBeGreaterThan(0)
-        expect(Number.isSafeInteger(line.listUnitPriceCents)).toBe(true)
         expect(Number.isSafeInteger(line.unitPriceCents)).toBe(true)
-        expect(line.unitPriceCents).toBeGreaterThan(0)
-        expect(line.unitPriceCents).toBeLessThanOrEqual(line.listUnitPriceCents)
-        if (line.promotionCode) expect(line.unitPriceCents).toBeLessThan(line.listUnitPriceCents)
-        lineIds.add(`${order.id}:${line.product.id}`)
-        soldProducts.add(line.product.id)
+        expect(line.unitPriceCents).toBe(Math.round(album!.price * 100))
       }
     }
-
-    expect(soldProducts.size).toBe(data.products.length)
     expect(data.orders.some(order => order.lines.length > 1)).toBe(true)
-    expect(data.orders.some(order => order.locationId === 'online')).toBe(true)
-    expect(data.orders.some(order => order.locationId !== 'online')).toBe(true)
-    expect(lineIds.size).toBeGreaterThan(data.orders.length)
+    const purchaseCounts = new Map<string, number>()
+    for (const order of data.orders) {
+      purchaseCounts.set(order.customerId, (purchaseCounts.get(order.customerId) ?? 0) + 1)
+    }
+    expect([...purchaseCounts.values()].some(count => count > 1)).toBe(true)
   })
 
-  it('includes promotions, price changes and observable workshop scenarios', () => {
-    const products = new Map(data.products.map(product => [product.id, product]))
-    const lines = data.orders.flatMap(order => order.lines.map(line => ({ order, line, product: products.get(line.product.id)! })))
-    expect(lines.some(({ line }) => line.promotionCode !== null)).toBe(true)
-    expect(lines.some(({ line, product }) => line.unitPriceCents !== product.priceCents)).toBe(true)
-
-    const onlineRate = (year: string): number => {
-      const orders = data.orders.filter(order => order.date.startsWith(year))
-      return orders.filter(order => order.locationId === 'online').length / orders.length
-    }
-    expect(onlineRate('2025')).toBeGreaterThan(onlineRate('2024'))
-
-    const automailLines = lines.filter(({ product }) => product.category === 'Automails et pièces mécaniques')
-    expect(automailLines.filter(({ order }) => order.locationId === 'store-04').length)
-      .toBeGreaterThan(automailLines.filter(({ order }) => order.locationId === 'store-06').length)
-
-    const rareBriggsOrders = data.orders.filter(order => order.locationId === 'store-05'
-      && order.lines.some(line => products.get(line.product.id)!.themes.includes('rare')))
-    expect(rareBriggsOrders.length).toBeGreaterThan(10)
-    expect(rareBriggsOrders.some(order => order.lines.reduce(
-      (sum, line) => sum + line.quantity * line.unitPriceCents,
-      0
-    ) >= 50000)).toBe(true)
-
+  it.each([
+    ['christmas', 6],
+    ['love', 5],
+    ['summer', 2],
+    ['halloween', 4],
+    ['study', 2.5]
+  ] as const)('has measurable %s peaks in both years and both channels', (tag, minimumLift) => {
+    // Use established single-theme albums so launches and overlapping themes do not bias the comparison.
+    const albumIds = new Set(data.albums.filter(album =>
+      album.saleStartDate < DEMO_START_DATE && album.tags.length === 1 && album.tags[0] === tag
+    ).map(album => album.id))
     for (const year of ['2024', '2025']) {
-      const start = `${year}-08-15`
-      const end = `${year}-09-30`
-      const seasonalUnits = lines.filter(({ order, product }) =>
-        order.date >= start && order.date <= end && product.themes.includes('school')
-      ).reduce((sum, { line }) => sum + line.quantity, 0)
-      const seasonalDays = days(start, end)
-      const otherDays = days(`${year}-01-01`, `${year}-12-31`) - seasonalDays
-      const otherUnits = lines.filter(({ order, product }) =>
-        order.date.startsWith(year) && (order.date < start || order.date > end) && product.themes.includes('school')
-      ).reduce((sum, { line }) => sum + line.quantity, 0)
-      expect((seasonalUnits / seasonalDays) / (otherUnits / otherDays), `${year} school demand`).toBeGreaterThan(2)
-    }
-
-    const physicalStores = new Set(data.locations.filter(location => location.channel === 'store').map(location => location.id))
-    for (const order of data.orders.filter(order => order.lines.some(line => products.get(line.product.id)!.themes.includes('rare')))) {
-      if (order.locationId === 'online') continue
-      expect(physicalStores.has(order.locationId)).toBe(true)
+      const event = data.events.find(event => event.albumTag === tag && event.startDate.startsWith(year))!
+      const peakDays = days(event.startDate, event.endDate)
+      const offDays = days(`${year}-01-01`, `${year}-12-31`) - peakDays
+      for (const channel of ['online', 'store']) {
+        const locationIds = new Set(data.locations.filter(location => location.channel === channel).map(location => location.id))
+        let peakUnits = 0
+        let offUnits = 0
+        for (const order of data.orders) {
+          if (!order.date.startsWith(year) || !locationIds.has(order.locationId)) continue
+          const units = order.lines.filter(line => albumIds.has(line.product.id)).reduce((sum, line) => sum + line.quantity, 0)
+          if (order.date >= event.startDate && order.date <= event.endDate) peakUnits += units
+          else offUnits += units
+        }
+        expect(offUnits).toBeGreaterThan(0)
+        expect((peakUnits / peakDays) / (offUnits / offDays), `${tag}, ${year}, ${channel}`).toBeGreaterThan(minimumLift)
+      }
     }
   })
 
-  it('stays small enough to seed browser localStorage and contains no cost or margin fields', () => {
-    const storedCharacters = JSON.stringify({ version: 1, dataset: data }).length
-    expect(storedCharacters * 2).toBeLessThan(4.5 * 1024 * 1024)
-    expect(data.products.every(product => !('costCents' in product) && !('marginCents' in product))).toBe(true)
-    expect(data.orders.every(order => order.lines.every(line => !('costCents' in line) && !('marginCents' in line)))).toBe(true)
+  it('bounds Christmas and Valentine events to the requested calendar windows', () => {
+    for (const year of ['2024', '2025']) {
+      expect(data.events.find(event => event.id === `christmas-${year}`)).toMatchObject({
+        startDate: `${year}-11-01`, endDate: `${year}-12-31`
+      })
+      expect(data.events.find(event => event.id === `valentine-${year}`)).toMatchObject({
+        startDate: `${year}-02-01`, endDate: `${year}-02-14`
+      })
+    }
   })
 
-  it('returns independent deep copies of the bundled fixture', () => {
+  it('returns independent copies without mutating the bundled fixture', () => {
     const copy = createDemoSales()
-    copy.products[0]!.name = 'Modified'
-    copy.products[0]!.themes.push('modified')
+    copy.albums[0]!.title = 'Edited'
+    copy.albums[0]!.tags.push('edited')
     copy.orders[0]!.lines[0]!.quantity = 999
-    copy.orders[0]!.eventIds.push('modified')
-    copy.customers[0]!.region = 'Modified'
-    copy.locations[0]!.name = 'Modified'
+    copy.orders[0]!.eventIds.push('edited')
+    copy.customers[0]!.region = 'Edited'
+    copy.locations[0]!.name = 'Edited'
     expect(createDemoSales()).toEqual(data)
   })
 })

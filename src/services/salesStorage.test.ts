@@ -17,8 +17,15 @@ describe('sales data storage', () => {
   it('writes and reads the initial local sales fixture', () => {
     const seeded = loadSalesDataset(storage)
     expect(seeded).toEqual(createDemoSales())
-    expect(JSON.parse(values.get(SALES_STORAGE_KEY)!)).toEqual({ version: 1, dataset: createDemoSales() })
+    expect(JSON.parse(values.get(SALES_STORAGE_KEY)!).version).toBe(2)
     expect(loadSalesDataset(storage)).toEqual(seeded)
+  })
+
+  it('reads the original expanded format without changing it', () => {
+    const saved = JSON.stringify({ version: 1, dataset: createDemoSales() })
+    values.set(SALES_STORAGE_KEY, saved)
+    expect(loadSalesDataset(storage)).toEqual(createDemoSales())
+    expect(values.get(SALES_STORAGE_KEY)).toBe(saved)
   })
 
   it('preserves the sample data size below a conservative browser quota', () => {
@@ -37,14 +44,14 @@ describe('sales data storage', () => {
   it('rejects invalid writes without replacing saved data', () => {
     const dataset = loadSalesDataset(storage)
     const saved = values.get(SALES_STORAGE_KEY)
-    dataset.orders[0]!.lines[0]!.unitPriceCents = 0
+    dataset.orders[0]!.lines[0]!.unitPriceCents = -1
     expect(() => saveSalesDataset(dataset, storage)).toThrow('Invalid sales dataset')
     expect(values.get(SALES_STORAGE_KEY)).toBe(saved)
   })
 
   it('rejects an order dated before its sales location opened', () => {
     const dataset = createDemoSales()
-    const order = dataset.orders.find(candidate => candidate.locationId !== 'online')!
+    const order = dataset.orders.find(candidate => dataset.locations.find(location => location.id === candidate.locationId)?.channel === 'store')!
     const location = dataset.locations.find(candidate => candidate.id === order.locationId)!
     const nextDay = new Date(Date.parse(`${order.date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)
     location.openedOn = nextDay

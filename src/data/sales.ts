@@ -9,11 +9,8 @@ const salesChannel = (value: string): SalesChannel => {
   throw new Error(`Invalid channel in bundled sales data: ${value}`)
 }
 
-export const createDemoSales = (): SalesDataset => {
-  const copy = structuredClone(dataset)
-  return {
-    ...copy,
-    locations: copy.locations.map(location => ({ ...location, channel: salesChannel(location.channel) })),
-    customers: copy.customers.map(customer => ({ ...customer, preferredChannel: salesChannel(customer.preferredChannel) }))
-  }
-}
+export const createDemoSales = (): SalesDataset => ({
+  ...structuredClone(dataset),
+  locations: dataset.locations.map(location => ({ ...location, channel: salesChannel(location.channel) })),
+  customers: dataset.customers.map(customer => ({ ...customer, preferredChannel: salesChannel(customer.preferredChannel) }))
+})
