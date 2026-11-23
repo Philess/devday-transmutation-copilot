@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import TransmuteStore from './TransmuteStore.vue'
+import App from './App.vue'
 import './styles/transmute.css'
 
-createApp(TransmuteStore).mount('#app')
+createApp(App).mount('#app')

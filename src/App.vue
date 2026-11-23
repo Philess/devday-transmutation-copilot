@@ -1,431 +1,506 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import ProductCard from './components/ProductCard.vue'
-import WorkshopDataView from './components/WorkshopDataView.vue'
-import type { CartItem } from './services/cartStorage'
-import { loadCart, saveCart } from './services/cartStorage'
-import { loadProducts, resetProducts } from './services/productStorage'
-import { filterProducts } from './services/productSearch'
-import { orderTotalCents } from './services/money'
-import { loadSalesDataset, resetSalesDataset, saveSalesDataset } from './services/salesStorage'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { Product } from './types/product'
-import type { SalesDataset, SalesOrder } from './types/sales'
+import type { SalesDataset } from './types/sales'
+import { loadCart, saveCart, type CartItem } from './services/cartStorage'
+import { loadProducts, resetProducts } from './services/productStorage'
+import { loadSalesDataset, resetSalesDataset, saveSalesDataset } from './services/salesStorage'
+import { filterProducts } from './services/productSearch'
+import {
+  buildSampleOrder, cartTotal, MAX_QUANTITY, resolveCart, sortProducts, type ProductSort
+} from './services/checkout'
+import ProductCard from './components/ProductCard.vue'
+import CartDrawer, { type OrderReceipt } from './components/CartDrawer.vue'
+import CircleGlyph from './components/CircleGlyph.vue'
+import HeroArt from './components/HeroArt.vue'
+import WorkshopDataView from './components/WorkshopDataView.vue'
+
+const markUrl = `${import.meta.env.BASE_URL}transmute-mark.svg`
+const message = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 const products = ref<Product[]>([])
 const sales = ref<SalesDataset | null>(null)
 const cart = ref<CartItem[]>([])
-const selectedCategory = ref('all')
+const productsError = ref<string | null>(null)
+const salesError = ref<string | null>(null)
+const cartReadError = ref<string | null>(null)
+const actionError = ref<string | null>(null)
+const loading = ref(true)
 const search = ref('')
+const category = ref('all')
+const sort = ref<ProductSort>('featured')
 const activeView = ref<'shop' | 'data'>('shop')
 const cartOpen = ref(false)
-const selectedLocationId = ref('online')
-const loading = ref(true)
-const error = ref<string | null>(null)
-const notice = ref<string | null>(null)
+const locationId = ref('online')
+const receipt = ref<OrderReceipt | null>(null)
+const toast = ref('')
+const searchInput = ref<HTMLInputElement | null>(null)
+let toastTimer: number | undefined
 
-const categories = computed(() => [...new Set(products.value.map(product => product.category))])
-const filteredProducts = computed(() => filterProducts(products.value, search.value, selectedCategory.value))
-const cartCount = computed(() => cart.value.reduce((sum, item) => sum + item.quantity, 0))
-const cartEntries = computed(() => cart.value.map(item => ({
-  ...item,
-  product: products.value.find(product => product.id === item.productId)
-})).filter(entry => entry.product))
-const cartTotalCents = computed(() => orderTotalCents(cartEntries.value.map(entry => ({
-  quantity: entry.quantity,
-  unitPriceCents: entry.product!.priceCents
-}))))
-const physicalLocations = computed(() => sales.value?.locations.filter(location => location.channel === 'store') ?? [])
-const formatUSD = (cents: number): string =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
-
-const showError = (context: string, reason: unknown): void => {
-  const detail = reason instanceof Error ? reason.message : String(reason)
-  console.error(`${context}:`, reason)
-  error.value = `${context} ${detail}`
-}
-
-const cartLines = (items: CartItem[], catalog: Product[]) => items.map(item => {
-  const product = catalog.find(candidate => candidate.id === item.productId)
-  if (!product) throw new Error('Le panier enregistré contient un produit absent du catalogue.')
-  return { quantity: item.quantity, unitPriceCents: product.priceCents }
-})
-
-const loadShop = (): void => {
-  loading.value = true
-  error.value = null
-  notice.value = null
+const loadProductData = (): void => {
   try {
-    const savedProducts = loadProducts()
-    const savedSales = loadSalesDataset()
-    const savedCart = loadCart()
-    orderTotalCents(cartLines(savedCart, savedProducts))
-    products.value = savedProducts
-    sales.value = savedSales
-    cart.value = savedCart
-    if (!savedSales.locations.some(location => location.id === selectedLocationId.value)) {
-      selectedLocationId.value = savedSales.locations[0]?.id ?? ''
-    }
+    products.value = loadProducts()
+    productsError.value = null
   } catch (reason) {
-    showError('Impossible de lire ou valider les données locales.', reason)
-  } finally {
-    loading.value = false
+    products.value = []
+    productsError.value = message(reason)
   }
 }
 
-const persistCart = (nextCart: CartItem[]): boolean => {
+const loadSalesData = (): void => {
   try {
-    orderTotalCents(cartLines(nextCart, products.value))
-    saveCart(nextCart)
-    cart.value = nextCart
-    error.value = null
+    sales.value = loadSalesDataset()
+    salesError.value = null
+    if (!sales.value.locations.some(location => location.id === locationId.value)) {
+      locationId.value = sales.value.locations[0]?.id ?? ''
+    }
+  } catch (reason) {
+    sales.value = null
+    salesError.value = message(reason)
+  }
+}
+
+const loadCartData = (): void => {
+  try {
+    cart.value = loadCart()
+    cartReadError.value = null
+  } catch (reason) {
+    cart.value = []
+    cartReadError.value = message(reason)
+  }
+}
+
+const loadShop = (): void => {
+  loading.value = true
+  actionError.value = null
+  loadProductData()
+  loadSalesData()
+  loadCartData()
+  loading.value = false
+}
+
+const categories = computed(() => [...new Set(products.value.map(product => product.category))])
+const visible = computed(() => sortProducts(filterProducts(products.value, search.value, category.value), sort.value))
+const resolved = computed(() => resolveCart(cart.value, products.value))
+const totalCents = computed(() => {
+  try { return cartTotal(resolved.value.entries) } catch { return 0 }
+})
+const cartCount = computed(() => cart.value.reduce((sum, item) => sum + item.quantity, 0))
+const quantityOf = (productId: number): number => cart.value.find(item => item.productId === productId)?.quantity ?? 0
+const locations = computed(() => sales.value?.locations ?? [])
+
+const orderBlocked = computed(() => {
+  if (salesError.value) return 'Les ventes locales sont illisibles : la commande d’essai est indisponible.'
+  if (resolved.value.missing.length > 0) return 'Retirez d’abord les articles indisponibles pour valider la commande.'
+  if (!locations.value.some(location => location.id === locationId.value)) return 'Choisissez un point de vente disponible.'
+  return ''
+})
+const canOrder = computed(() => resolved.value.entries.length > 0 && orderBlocked.value === '')
+
+const announce = (text: string): void => {
+  toast.value = text
+  window.clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(() => { toast.value = '' }, 3600)
+}
+
+// The in-memory cart only changes once the browser has accepted the write.
+const persistCart = (next: CartItem[]): boolean => {
+  try {
+    cartTotal(resolveCart(next, products.value).entries)
+    saveCart(next)
+    cart.value = next
+    actionError.value = null
     return true
   } catch (reason) {
-    showError('Impossible d’enregistrer le panier dans ce navigateur.', reason)
+    actionError.value = `Impossible d’enregistrer le panier dans ce navigateur : rien n’a changé. ${message(reason)}`
     return false
   }
 }
 
 const addToCart = (product: Product): void => {
-  const existing = cart.value.find(item => item.productId === product.id)
-  const next = existing
-    ? cart.value.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item)
-    : [...cart.value, { productId: product.id, quantity: 1 }]
-  if (persistCart(next)) notice.value = `${product.name} ajouté au panier.`
+  if (cartReadError.value) return
+  const current = quantityOf(product.id)
+  if (current >= MAX_QUANTITY) return
+  const next = current === 0
+    ? [...cart.value, { productId: product.id, quantity: 1 }]
+    : cart.value.map(item => (item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item))
+  if (persistCart(next)) announce(`${product.name} ajouté au panier.`)
 }
 
-const changeQuantity = (productId: number, event: Event): void => {
-  const input = event.target
-  if (!(input instanceof HTMLInputElement)) return
-  const quantity = Number(input.value)
-  const product = products.value.find(item => item.id === productId)
-  if (!product || !Number.isSafeInteger(quantity) || quantity < 1) {
-    error.value = 'La quantité doit être un nombre entier positif.'
+const setQuantity = (productId: number, quantity: number): void => {
+  if (quantity < 1 || quantity > MAX_QUANTITY) return
+  persistCart(cart.value.map(item => (item.productId === productId ? { ...item, quantity } : item)))
+}
+
+const removeItem = (productId: number): void => { persistCart(cart.value.filter(item => item.productId !== productId)) }
+
+const removeMissing = (): void => {
+  const gone = new Set(resolved.value.missing)
+  persistCart(cart.value.filter(item => !gone.has(item.productId)))
+}
+
+const placeOrder = (): void => {
+  if (!sales.value || !canOrder.value) return
+  const entries = resolved.value.entries
+  let result
+  try {
+    result = buildSampleOrder(sales.value, entries, locationId.value, new Date().toISOString().slice(0, 10))
+    saveSalesDataset(result.dataset)
+  } catch (reason) {
+    actionError.value = `Impossible d’enregistrer la commande d’essai : rien n’a été modifié. ${message(reason)}`
     return
   }
-  persistCart(cart.value.map(item => item.productId === productId ? { ...item, quantity } : item))
+  sales.value = result.dataset
+  receipt.value = {
+    orderId: result.orderId,
+    count: entries.reduce((sum, entry) => sum + entry.quantity, 0),
+    totalCents: totalCents.value,
+    locationName: result.locationName
+  }
+  try {
+    saveCart([])
+    cart.value = []
+    actionError.value = null
+  } catch (reason) {
+    actionError.value = `La commande est enregistrée, mais le panier n’a pas pu être vidé du stockage local. ${message(reason)}`
+  }
 }
 
-const removeFromCart = (productId: number): void => {
-  persistCart(cart.value.filter(item => item.productId !== productId))
+const closeCart = (): void => { cartOpen.value = false; receipt.value = null }
+
+const discardSavedCart = (): void => {
+  if (!window.confirm('Supprimer le panier enregistré qui ne peut pas être lu ? Cette action est définitive.')) return
+  try {
+    saveCart([])
+    cart.value = []
+    cartReadError.value = null
+  } catch (reason) {
+    actionError.value = `Le panier illisible n’a pas pu être supprimé. ${message(reason)}`
+  }
+}
+
+const replaceProducts = (): void => {
+  if (!window.confirm('Remplacer le catalogue enregistré par les produits de démonstration ? Les données illisibles seront écrasées.')) return
+  try {
+    products.value = resetProducts()
+    productsError.value = null
+  } catch (reason) {
+    productsError.value = message(reason)
+  }
+}
+
+const replaceSales = (): void => {
+  if (!window.confirm('Remplacer les ventes enregistrées par les ventes de démonstration ? Les données illisibles seront écrasées.')) return
+  try {
+    sales.value = resetSalesDataset()
+    salesError.value = null
+  } catch (reason) {
+    salesError.value = message(reason)
+  }
 }
 
 const resetDemoData = (): void => {
-  if (!window.confirm('Réinitialiser les produits et les ventes de démonstration enregistrés dans ce navigateur ?')) return
+  if (!window.confirm('Réinitialiser les produits et les ventes de démonstration enregistrés dans ce navigateur ? Les commandes locales et le panier seront supprimés.')) return
   try {
     products.value = resetProducts()
     sales.value = resetSalesDataset()
     saveCart([])
     cart.value = []
-    selectedCategory.value = 'all'
+    productsError.value = null
+    salesError.value = null
+    cartReadError.value = null
+    actionError.value = null
+    category.value = 'all'
     search.value = ''
-    notice.value = 'Les données locales de démonstration ont été réinitialisées.'
-    error.value = null
+    announce('Données de démonstration réinitialisées.')
   } catch (reason) {
-    showError('Impossible de réinitialiser les données locales.', reason)
+    actionError.value = `Impossible de réinitialiser les données locales. ${message(reason)}`
   }
 }
 
-const completeOrder = (): void => {
-  if (!sales.value || cartEntries.value.length === 0) {
-    error.value = 'Ajoutez au moins un article au panier avant de valider la commande.'
-    return
-  }
-  const location = sales.value.locations.find(item => item.id === selectedLocationId.value)
-  if (!location) {
-    error.value = 'Choisissez un point de vente disponible.'
-    return
-  }
-  try {
-    orderTotalCents(cartLines(cart.value, products.value))
-  } catch (reason) {
-    showError('Impossible de valider le montant de la commande.', reason)
-    return
-  }
+const clearFilters = (): void => { search.value = ''; category.value = 'all'; searchInput.value?.focus() }
 
-  const date = new Date().toISOString().slice(0, 10)
-  const orderNumber = sales.value.orders.length + 1
-  const customerNumber = sales.value.customers.length + 1
-  const customerId = `Requisition-${String(customerNumber).padStart(4, '0')}`
-  const customerLocation = location.channel === 'store' ? location : physicalLocations.value[0]
-  if (!customerLocation) {
-    error.value = 'Aucun magasin physique ne permet de créer un client de démonstration.'
-    return
-  }
-  const customer = {
-    id: customerId,
-    region: customerLocation.region,
-    homeStoreId: customerLocation.id,
-    joinedOn: date,
-    preferredCategory: cartEntries.value[0]?.product?.category ?? '',
-    preferredChannel: location.channel
-  }
-  const order: SalesOrder & { eventIds: string[] } = {
-    id: `LOCAL-${String(orderNumber).padStart(6, '0')}`,
-    date,
-    customerId,
-    locationId: location.id,
-    eventIds: sales.value.events.filter(event => event.startDate <= date && event.endDate >= date).map(event => event.id),
-    lines: cartEntries.value.map(entry => ({
-      product: { id: entry.product!.id, name: entry.product!.name, category: entry.product!.category },
-      quantity: entry.quantity,
-      listUnitPriceCents: entry.product!.priceCents,
-      unitPriceCents: entry.product!.priceCents,
-      promotionCode: null
-    }))
-  }
-  const nextSales: SalesDataset = {
-    ...sales.value,
-    metadata: {
-      ...sales.value.metadata,
-      startDate: date < sales.value.metadata.startDate ? date : sales.value.metadata.startDate,
-      endDate: date > sales.value.metadata.endDate ? date : sales.value.metadata.endDate
-    },
-    customers: [...sales.value.customers, customer],
-    orders: [...sales.value.orders, order]
-  }
-  try {
-    saveSalesDataset(nextSales)
-    sales.value = nextSales
-    cart.value = []
-    try {
-      saveCart([])
-    } catch (reason) {
-      showError('La commande est enregistrée, mais le panier n’a pas pu être effacé du stockage local.', reason)
-    }
-    notice.value = `Commande locale ${order.id} enregistrée. Aucun paiement réel n’a été effectué.`
-    cartOpen.value = false
-  } catch (reason) {
-    showError('Impossible d’enregistrer la commande dans le stockage local.', reason)
-  }
+const onShortcut = (event: KeyboardEvent): void => {
+  const target = event.target as HTMLElement | null
+  if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || cartOpen.value || activeView.value !== 'shop') return
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.isContentEditable)) return
+  event.preventDefault()
+  searchInput.value?.focus()
 }
 
-onMounted(loadShop)
+onMounted(() => {
+  loadShop()
+  window.addEventListener('keydown', onShortcut)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onShortcut)
+  window.clearTimeout(toastTimer)
+})
 </script>
 
 <template>
-  <div class="site-shell">
-    <nav class="topbar" aria-label="Navigation principale">
-      <a class="wordmark" href="#" @click.prevent="activeView = 'shop'">
-        <span class="seal" aria-hidden="true">CA</span>
-        <span><strong>Central Alchemy Supply</strong><small>APPROVISIONNEMENT · AMESTRIS</small></span>
+  <div class="page">
+    <svg class="watermark" viewBox="0 0 1000 1000" aria-hidden="true">
+      <CircleGlyph :cx="500" :cy="500" :r="470" :n="6" :k="2" color="#7fe7ff" :width="2" :opacity="0.22" />
+    </svg>
+
+    <a class="skip" href="#shelf">Aller aux produits</a>
+
+    <header class="top">
+      <a class="brand" href="#top" aria-label="Central Alchemy Supply, accueil" @click="activeView = 'shop'">
+        <img :src="markUrl" alt="" width="46" height="46">
+        <span class="wordmark">CENTRAL<small>Alchemy Supply</small></span>
       </a>
-      <div class="nav-actions">
-        <button type="button" class="nav-link" @click="activeView = activeView === 'shop' ? 'data' : 'shop'">
+
+      <form v-if="activeView === 'shop'" class="search" role="search" @submit.prevent>
+        <label for="search" class="visually-hidden">Rechercher un produit, un fournisseur ou une origine</label>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4" /><path d="M15 15L21 21" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" /></svg>
+        <input id="search" ref="searchInput" v-model="search" type="search" autocomplete="off" placeholder="Produit, fournisseur ou origine" :disabled="productsError !== null">
+        <kbd aria-hidden="true">/</kbd>
+      </form>
+      <span v-else class="search-spacer" aria-hidden="true" />
+
+      <div class="actions-top">
+        <button type="button" class="nav-btn" :aria-pressed="activeView === 'data'" @click="activeView = activeView === 'shop' ? 'data' : 'shop'">
           {{ activeView === 'shop' ? 'Registre de données' : 'Retour à la boutique' }}
         </button>
-        <button type="button" class="cart-button" aria-controls="cart-panel" :aria-expanded="cartOpen" @click="cartOpen = !cartOpen">
-          Panier <span>{{ cartCount }}</span>
+        <button type="button" class="cart-btn" aria-controls="cart-panel" :aria-expanded="cartOpen" :aria-label="`Ouvrir le panier, ${cartCount} ${cartCount === 1 ? 'article' : 'articles'}`" @click="cartOpen = true">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M2.5 4H5L7.2 15H18.5L20.5 7H6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /><circle cx="9" cy="19.5" r="1.8" fill="currentColor" /><circle cx="17" cy="19.5" r="1.8" fill="currentColor" /></svg>
+          <span class="cart-label">Panier</span>
+          <span class="badge" aria-hidden="true">{{ cartCount }}</span>
         </button>
       </div>
-    </nav>
+    </header>
 
-    <div v-if="error" class="alert" role="alert">
-      <p>{{ error }}</p>
-      <button type="button" @click="loadShop">Réessayer la lecture</button>
+    <div v-if="cartReadError" class="banner" role="alert">
+      <p><strong>Le panier enregistré n’a pas pu être lu.</strong> L’ajout d’articles est suspendu pour ne pas écraser les données. Détail : {{ cartReadError }}.</p>
+      <button type="button" @click="loadCartData">Réessayer la lecture</button>
+      <button type="button" @click="discardSavedCart">Supprimer le panier enregistré</button>
     </div>
-    <p v-if="notice" class="notice" role="status">{{ notice }}</p>
+    <div v-if="actionError" class="banner" role="alert">
+      <p>{{ actionError }}</p>
+      <button type="button" @click="actionError = null">Fermer</button>
+    </div>
 
-    <div v-if="loading" class="loading" role="status">Ouverture des archives locales…</div>
+    <p v-if="loading" class="loading" role="status">Ouverture des archives locales…</p>
+
     <WorkshopDataView v-else-if="activeView === 'data' && sales" :dataset="sales" />
-    <main v-else-if="sales" class="shop-view">
-      <header class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Bureau central d’approvisionnement · Depuis 1914</p>
-          <h1>Outils pour<br><span>l’art de transformer.</span></h1>
-          <p class="hero-subtitle">Équipement, ouvrages et composants pour alchimistes d’État et praticiens indépendants.</p>
-          <a class="hero-link" href="#catalogue">Parcourir l’inventaire <span aria-hidden="true">↓</span></a>
+    <main v-else-if="activeView === 'data'" class="layout single">
+      <div class="state" role="alert">
+        <h3>Les ventes enregistrées sont illisibles</h3>
+        <p>{{ salesError }}. Vos données enregistrées n’ont pas été modifiées.</p>
+        <div class="actions">
+          <button type="button" class="solid" @click="loadSalesData">Réessayer la lecture</button>
+          <button type="button" class="outline" @click="replaceSales">Remplacer par les ventes de démonstration</button>
         </div>
-        <div class="transmutation-mark" aria-hidden="true">
-          <svg viewBox="0 0 240 240">
-            <circle cx="120" cy="120" r="95" />
-            <circle cx="120" cy="120" r="69" />
-            <path d="M120 25v190M25 120h190M53 53l134 134M187 53 53 187M120 51l37 69-37 69-37-69z" />
-            <circle cx="120" cy="120" r="11" />
-          </svg>
-          <span>Édition<br>de terrain</span>
-        </div>
-        <div class="hero-index">CAS / 24—25 <i></i> INVENTAIRE LOCAL</div>
-      </header>
+      </div>
+    </main>
 
-      <section id="catalogue" class="catalogue" aria-labelledby="catalogue-title">
-        <div class="catalogue-heading">
-          <div>
-            <p class="eyebrow">Catalogue de démonstration</p>
-            <h2 id="catalogue-title">Matériel en réserve</h2>
-          </div>
-          <p class="catalogue-caption">Prix catalogue en USD · statuts de collection</p>
-        </div>
+    <main v-else id="top" class="layout">
+      <aside class="art" aria-label="Mascotte de la boutique">
+        <HeroArt />
+        <p class="caption">Illustration originale, inspirée d’aucun personnage existant.</p>
+      </aside>
 
-        <div class="filters">
-          <label class="search-field">
-            <span>Recherche d’inventaire</span>
-            <input v-model="search" type="search" placeholder="Nom, fournisseur ou origine" autocomplete="off">
-          </label>
-          <div class="category-filter" role="group" aria-label="Filtrer par catégorie">
-            <button type="button" :aria-pressed="selectedCategory === 'all'" @click="selectedCategory = 'all'">Toutes les catégories</button>
-            <button
-              v-for="category in categories"
-              :key="category"
-              type="button"
-              :aria-pressed="selectedCategory === category"
-              @click="selectedCategory = category"
-            >
-              {{ category }}
-            </button>
+      <section class="content">
+        <p class="kicker">Fournitures fictives · démonstration locale</p>
+        <h1>Tout pour<br><span>transmuter.</span></h1>
+        <p class="lede">Ouvrages, composants, instruments et matériel de terrain de Central. Choisissez, remplissez le panier et passez une commande d’essai. Rien n’est vendu ni expédié.</p>
+
+        <div class="toolbar">
+          <h2 id="shelf" tabindex="-1">Le comptoir</h2>
+          <p class="count" role="status">{{ productsError ? '' : `${visible.length} sur ${products.length} ${products.length === 1 ? 'produit' : 'produits'}` }}</p>
+          <div class="sort">
+            <label for="sort">Trier par</label>
+            <select id="sort" v-model="sort" :disabled="productsError !== null">
+              <option value="featured">Ordre du catalogue</option>
+              <option value="price-asc">Prix croissant</option>
+              <option value="price-desc">Prix décroissant</option>
+              <option value="name">Nom</option>
+            </select>
           </div>
         </div>
 
-        <p class="results-note" aria-live="polite">{{ filteredProducts.length }} références affichées</p>
-        <p v-if="filteredProducts.length === 0" class="empty-state">Aucun produit ne correspond à cette recherche. Modifiez le texte ou choisissez une autre catégorie.</p>
-        <div v-else class="product-grid">
-          <ProductCard
-            v-for="product in filteredProducts"
-            :key="product.id"
-            :product="product"
-            @add="addToCart"
-          />
+        <div v-if="!productsError && products.length > 0" class="cats" role="group" aria-label="Catégories">
+          <button type="button" :aria-pressed="category === 'all'" @click="category = 'all'">Toutes</button>
+          <button v-for="name in categories" :key="name" type="button" :aria-pressed="category === name" @click="category = name">{{ name }}</button>
         </div>
+
+        <div v-if="productsError" class="state" role="alert">
+          <h3>Le catalogue enregistré est illisible</h3>
+          <p>{{ productsError }}. Vos données enregistrées n’ont pas été modifiées.</p>
+          <div class="actions">
+            <button type="button" class="solid" @click="loadProductData">Réessayer la lecture</button>
+            <button type="button" class="outline" @click="replaceProducts">Remplacer par les produits de démonstration</button>
+          </div>
+        </div>
+        <div v-else-if="products.length === 0" class="state">
+          <h3>Aucun produit</h3>
+          <p>Le catalogue enregistré est vide. Il n’a pas été réinitialisé.</p>
+          <div class="actions"><button type="button" class="outline" @click="replaceProducts">Restaurer les produits de démonstration</button></div>
+        </div>
+        <div v-else-if="visible.length === 0" class="state" role="status">
+          <h3>Aucun produit ne correspond</h3>
+          <p>Essayez un autre mot (nom, fournisseur, origine) ou une autre catégorie.</p>
+          <div class="actions"><button type="button" class="solid" @click="clearFilters">Effacer les filtres</button></div>
+        </div>
+        <ul v-else class="shelf" aria-labelledby="shelf">
+          <li v-for="product in visible" :key="product.id">
+            <ProductCard :product="product" :in-cart="quantityOf(product.id)" :cart-paused="cartReadError !== null" @add="addToCart" />
+          </li>
+        </ul>
       </section>
     </main>
 
-    <aside v-if="cartOpen && sales" id="cart-panel" class="cart-panel" aria-labelledby="cart-title">
-      <div class="cart-heading">
-        <div><p class="eyebrow">Réquisition locale</p><h2 id="cart-title">Votre panier</h2></div>
-        <button type="button" class="close-button" aria-label="Fermer le panier" @click="cartOpen = false">×</button>
-      </div>
-      <p class="cart-disclaimer">Simulation locale uniquement : aucune adresse ni donnée de paiement n’est demandée.</p>
-      <p v-if="cartEntries.length === 0" class="empty-state">Votre panier est vide.</p>
-      <ul v-else class="cart-list">
-        <li v-for="entry in cartEntries" :key="entry.productId">
-          <div class="cart-product">
-            <strong>{{ entry.product!.name }}</strong>
-            <span>{{ formatUSD(entry.product!.priceCents) }} l’unité</span>
-          </div>
-          <label class="quantity-field">
-            <span>Quantité</span>
-            <input
-              type="number"
-              min="1"
-              :value="entry.quantity"
-              :aria-label="`Quantité pour ${entry.product!.name}`"
-              @change="changeQuantity(entry.productId, $event)"
-            >
-          </label>
-          <button type="button" class="remove-button" :aria-label="`Retirer ${entry.product!.name} du panier`" @click="removeFromCart(entry.productId)">Retirer</button>
-        </li>
-      </ul>
-      <div v-if="cartEntries.length > 0" class="checkout">
-        <p class="order-total"><span>Total de la commande</span><strong>{{ formatUSD(cartTotalCents) }}</strong></p>
-        <label for="location">Canal ou point de retrait</label>
-        <select id="location" v-model="selectedLocationId">
-          <option value="online">En ligne · Online Requisition Portal</option>
-          <option v-for="location in physicalLocations" :key="location.id" :value="location.id">{{ location.name }}</option>
-        </select>
-        <button type="button" class="checkout-button" @click="completeOrder">Valider la commande de démonstration</button>
-        <small>Le panier et la commande restent dans le stockage local de ce navigateur.</small>
-      </div>
-    </aside>
+    <section v-if="activeView === 'shop'" class="steps" aria-labelledby="steps-title">
+      <h2 id="steps-title">Comment fonctionne la démonstration</h2>
+      <ol>
+        <li><span>1</span><div><h3>Choisir</h3><p>Filtrez par catégorie ou cherchez un produit, un fournisseur, une origine.</p></div></li>
+        <li><span>2</span><div><h3>Rassembler</h3><p>Le panier est enregistré dans ce navigateur uniquement.</p></div></li>
+        <li><span>3</span><div><h3>Commande d’essai</h3><p>Ajoutée aux ventes fictives locales. Aucun paiement, aucune expédition.</p></div></li>
+      </ol>
+    </section>
 
-    <footer class="site-footer">
-      <span>Central Alchemy Supply</span>
-      <span>Fournitures fictives · Démonstration locale · Prix en USD</span>
+    <footer class="foot">
+      <p>Central Alchemy Supply est une démonstration fictive : fournitures, fournisseurs et prix (USD) sont inventés, et toutes les illustrations sont originales, dessinées en code.</p>
       <button type="button" @click="resetDemoData">Réinitialiser les données de démonstration</button>
     </footer>
+
+    <p class="toast" role="status" aria-live="polite">{{ toast }}</p>
+
+    <CartDrawer
+      v-model:location-id="locationId"
+      :open="cartOpen"
+      :entries="resolved.entries"
+      :missing="resolved.missing"
+      :total-cents="totalCents"
+      :locations="locations"
+      :can-order="canOrder"
+      :order-blocked="orderBlocked"
+      :receipt="receipt"
+      @close="closeCart"
+      @set-quantity="setQuantity"
+      @remove="removeItem"
+      @remove-missing="removeMissing"
+      @place-order="placeOrder"
+    />
   </div>
 </template>
 
 <style scoped>
-:global(*) { box-sizing: border-box; }
-:global(html) { scroll-behavior: smooth; }
-:global(body) { margin: 0; min-width: 320px; background: #101923; font-family: 'Segoe UI', Arial, sans-serif; color: #e9e4d9; }
-:global(button), :global(input), :global(select) { font: inherit; }
-:global(:focus-visible) { outline: 3px solid #edc36e; outline-offset: 3px; }
-.site-shell { min-height: 100vh; background: radial-gradient(ellipse at 50% 0, #26384b 0, #121c28 56rem, #101923 100%); }
-.topbar { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-height: 82px; padding: 0.8rem clamp(1rem, 5vw, 4.5rem); border-bottom: 1px solid #d5b66e66; background: #101923e8; }
-.wordmark { display: flex; align-items: center; gap: 0.8rem; color: #f2eadc; text-decoration: none; }
-.wordmark strong { display: block; font-family: Georgia, 'Times New Roman', serif; font-size: 1.05rem; letter-spacing: 0.04em; }
-.wordmark small { display: block; margin-top: 0.2rem; color: #c1a669; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.17em; }
-.seal { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid #c49a52; border-radius: 50%; color: #e6c77e; font-family: Georgia, serif; font-size: 0.85rem; }
-.nav-actions { display: flex; align-items: center; gap: 0.7rem; }
-.nav-link, .cart-button { min-height: 44px; padding: 0.6rem 0.9rem; border: 1px solid #9c8b67; background: transparent; color: #efe7d9; cursor: pointer; }
-.nav-link:hover { background: #26384b; }
-.cart-button { border-color: #9c3d43; background: #7e2931; font-weight: 700; }
-.cart-button span { display: inline-grid; min-width: 1.45rem; height: 1.45rem; margin-left: 0.35rem; place-items: center; border-radius: 50%; background: #f3e7c9; color: #39232b; font-size: 0.8rem; }
-.alert, .notice { margin: 0; padding: 0.8rem 1rem; text-align: center; line-height: 1.5; }
-.alert { background: #7e2931; color: white; }
-.alert p { display: inline; margin: 0 0.8rem 0 0; }
-.alert button { min-height: 40px; padding: 0.4rem 0.75rem; border: 1px solid white; background: transparent; color: white; cursor: pointer; }
-.notice { background: #334c3c; color: #f3f1e7; }
-.loading { padding: 5rem 1rem; text-align: center; }
-.hero { position: relative; display: flex; align-items: center; justify-content: space-between; max-width: 1440px; min-height: 490px; margin: auto; padding: 4.5rem clamp(1.25rem, 9vw, 8rem) 5rem; overflow: hidden; border-bottom: 1px solid #c49a5266; background: linear-gradient(90deg, #121c28 0%, #121c28f2 42%, #121c28aa 100%); }
-.hero::before, .hero::after { position: absolute; width: 26rem; height: 26rem; border: 1px solid #c49a5224; border-radius: 50%; content: ''; pointer-events: none; }
-.hero::before { top: -19rem; left: 36%; }
-.hero::after { right: -15rem; bottom: -19rem; }
-.hero-copy { position: relative; z-index: 1; max-width: 650px; }
-.eyebrow { margin: 0 0 1rem; color: #d3b36c; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
-h1, h2 { font-family: Georgia, 'Times New Roman', serif; }
-.hero h1 { margin: 0; color: #f5efe4; font-size: clamp(2.8rem, 7vw, 5.6rem); font-weight: 500; line-height: 0.98; }
-.hero h1 span { color: #d7b66f; }
-.hero-subtitle { max-width: 560px; margin: 1.4rem 0 1.8rem; color: #d1d5d9; font-size: 1.1rem; line-height: 1.65; }
-.hero-link { display: inline-flex; align-items: center; gap: 0.8rem; min-height: 46px; padding: 0.65rem 1rem; border: 1px solid #bd984f; color: #f2d896; font-weight: 700; text-decoration: none; }
-.hero-link:hover { background: #bd984f22; }
-.transmutation-mark { position: relative; display: grid; width: min(33vw, 300px); aspect-ratio: 1; flex: 0 0 auto; place-items: center; margin-left: 2rem; color: #d9b36b; }
-.transmutation-mark svg { width: 100%; fill: none; stroke: #c49a5280; stroke-width: 1.4; }
-.transmutation-mark span { position: absolute; color: #ead9ae; font-family: Georgia, serif; font-size: 1.1rem; line-height: 1.4; text-align: center; text-transform: uppercase; }
-.hero-index { position: absolute; right: clamp(1rem, 5vw, 4rem); bottom: 1.3rem; display: flex; align-items: center; gap: 0.6rem; color: #9faab4; font-size: 0.66rem; letter-spacing: 0.14em; }
-.hero-index i { width: 0.35rem; height: 0.35rem; border-radius: 50%; background: #9a3a40; }
-.catalogue { max-width: 1440px; margin: auto; padding: 3.5rem clamp(1rem, 5vw, 4.5rem) 5rem; }
-.catalogue-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
-.catalogue-heading h2 { margin: 0; color: #f1e9db; font-size: clamp(2rem, 4vw, 3rem); font-weight: 500; }
-.catalogue-caption { color: #b7c0c6; font-size: 0.85rem; }
-.filters { display: grid; gap: 1rem; margin: 2rem 0 1rem; padding: 1.2rem; border: 1px solid #c9a95e55; background: #182534; }
-.search-field span, .quantity-field span { display: block; margin-bottom: 0.4rem; color: #e8dfcb; font-size: 0.83rem; font-weight: 700; }
-.search-field input, .quantity-field input, .checkout select { width: 100%; min-height: 46px; padding: 0.65rem 0.8rem; border: 1px solid #9098a0; border-radius: 0; background: #f9f5eb; color: #162231; }
-.category-filter { display: flex; flex-wrap: wrap; gap: 0.55rem; }
-.category-filter button { min-height: 42px; padding: 0.55rem 0.8rem; border: 1px solid #677381; background: transparent; color: #e7e1d6; font-size: 0.82rem; cursor: pointer; }
-.category-filter button[aria-pressed="true"] { border-color: #d7b66f; background: #d7b66f; color: #172332; font-weight: 800; }
-.results-note { color: #c0c7ca; font-size: 0.86rem; }
-.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr)); gap: 1.1rem; margin-top: 1rem; }
-.empty-state { padding: 1.5rem; border: 1px solid #6d7882; background: #1a2836; color: #e4dccf; }
-.cart-panel { position: fixed; z-index: 5; top: 0; right: 0; display: flex; width: min(100%, 440px); height: 100vh; flex-direction: column; overflow-y: auto; padding: 1.2rem; border-left: 1px solid #c49a52; background: #f5f0e5; color: #172332; box-shadow: -15px 0 45px #0008; }
-.cart-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.cart-heading .eyebrow { margin-bottom: 0.3rem; color: #7e2931; }
-.cart-heading h2 { margin: 0; font-size: 2rem; }
-.close-button { width: 44px; height: 44px; border: 1px solid #68717b; background: transparent; color: #172332; font-size: 1.6rem; cursor: pointer; }
-.cart-disclaimer { padding: 0.75rem; background: #e8dfd1; font-size: 0.88rem; line-height: 1.45; }
-.cart-list { display: grid; gap: 0.8rem; margin: 0; padding: 0; list-style: none; }
-.cart-list li { display: grid; grid-template-columns: 1fr 90px auto; align-items: end; gap: 0.55rem; padding: 0.8rem 0; border-bottom: 1px solid #d2cabb; }
-.cart-product strong, .cart-product span { display: block; }
-.cart-product strong { line-height: 1.35; }
-.cart-product span { margin-top: 0.3rem; color: #515c66; font-size: 0.85rem; }
-.quantity-field input { min-height: 40px; padding: 0.4rem; }
-.quantity-field span { color: #384551; font-size: 0.72rem; }
-.remove-button { min-height: 40px; padding: 0.4rem; border: 0; background: transparent; color: #762932; font-size: 0.8rem; text-decoration: underline; cursor: pointer; }
-.checkout { display: grid; gap: 0.7rem; margin-top: auto; padding-top: 1.2rem; }
-.order-total { display: flex; justify-content: space-between; gap: 1rem; margin: 0; padding: 0.9rem 0; border-top: 2px solid #293849; font-size: 1.05rem; }
-.checkout label { font-weight: 700; }
-.checkout-button { min-height: 48px; padding: 0.7rem; border: 1px solid #7e2931; background: #7e2931; color: white; font-weight: 800; cursor: pointer; }
-.checkout-button:hover { background: #612029; }
-.checkout small { color: #4a555f; line-height: 1.4; }
-.site-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.4rem clamp(1rem, 5vw, 4.5rem); border-top: 1px solid #c49a5255; background: #0c141d; color: #bac0c4; font-size: 0.78rem; }
-.site-footer span:first-child { color: #e2c47e; font-family: Georgia, serif; font-size: 0.98rem; }
-.site-footer button { min-height: 40px; padding: 0.5rem 0.7rem; border: 1px solid #75808a; background: transparent; color: #d7dce0; cursor: pointer; }
-.site-footer button:hover { background: #27394b; }
+.page { position: relative; min-height: 100vh; overflow-x: clip; }
+.watermark { position: fixed; top: 60px; right: -260px; width: 900px; height: 900px; pointer-events: none; z-index: 0; animation: spin 240s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .watermark { animation: none; } }
+.page > *:not(.watermark) { position: relative; z-index: 1; }
+.skip { position: absolute; left: 12px; top: -60px; z-index: 100; padding: 10px 16px; font-weight: 800; color: var(--ink); background: var(--gold); border-radius: 4px; }
+.skip:focus { top: 12px; }
 
-@media (max-width: 720px) {
-  .topbar { align-items: flex-start; flex-direction: column; }
-  .nav-actions { width: 100%; }
-  .nav-link { flex: 1; }
-  .hero { min-height: 440px; padding: 3rem 1.3rem 4rem; }
-  .transmutation-mark { position: absolute; right: -4rem; bottom: 1rem; width: 230px; opacity: 0.48; }
-  .hero-copy { max-width: 90%; }
-  .hero-subtitle { font-size: 1rem; }
-  .catalogue-heading { align-items: flex-start; flex-direction: column; }
-  .catalogue-caption { margin: 0; }
-  .site-footer { align-items: flex-start; flex-direction: column; }
+.top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 20px; max-width: 1480px; margin: 0 auto; padding: 14px 32px; }
+.brand { display: flex; align-items: center; gap: 12px; color: var(--text); text-decoration: none; }
+.wordmark { display: flex; flex-direction: column; font-family: var(--font-display); font-size: 1.7rem; line-height: .95; letter-spacing: .06em; }
+.wordmark small { margin-top: 3px; font-family: var(--font-body); font-size: .72rem; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: var(--gold); }
+.search { position: relative; display: flex; align-items: center; max-width: 560px; justify-self: center; width: 100%; color: var(--muted); }
+.search svg { position: absolute; left: 14px; pointer-events: none; }
+.search input { width: 100%; min-height: 50px; padding: 8px 46px; color: var(--text); background: var(--steel); border: 2px solid var(--steel-3); border-radius: 999px; }
+.search input::placeholder { color: var(--muted); }
+.search input:hover:not(:disabled) { border-color: var(--gold-deep); }
+.search input:disabled { opacity: .5; cursor: not-allowed; }
+.search kbd { position: absolute; right: 14px; display: grid; place-items: center; width: 26px; height: 26px; font-size: .85rem; font-weight: 800; color: var(--gold); border: 1.5px solid var(--steel-3); border-radius: 5px; }
+.actions-top { display: flex; align-items: center; gap: 12px; }
+.nav-btn { min-height: 50px; padding: 6px 16px; font-weight: 800; color: var(--text); background: transparent; border: 2px solid var(--steel-3); border-radius: 4px; }
+.nav-btn:hover { border-color: var(--gold); }
+.nav-btn[aria-pressed='true'] { color: var(--gold); border-color: var(--gold); }
+.cart-btn {
+  position: relative; display: inline-flex; align-items: center; gap: 10px; min-height: 50px; padding: 6px 20px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink); background: var(--gold); border: 3px solid var(--ink); border-radius: 4px; box-shadow: 0 4px 0 var(--gold-deep), 0 0 0 2px var(--ink);
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }
+.cart-btn:hover { transform: translateY(-1px); }
+.cart-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--gold-deep), 0 0 0 2px var(--ink); }
+.badge { display: grid; place-items: center; min-width: 28px; height: 28px; padding: 0 7px; font-family: var(--font-display); font-size: 1rem; letter-spacing: .03em; color: #fff; background: var(--crimson-deep); border: 2px solid var(--ink); border-radius: 999px; }
 
-@media (prefers-reduced-motion: reduce) {
-  :global(html) { scroll-behavior: auto; }
+.banner { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; max-width: 1416px; margin: 0 auto 12px; padding: 12px 18px; color: var(--ink); background: var(--parchment); border: 3px solid var(--crimson); border-radius: 4px; }
+.banner p { flex: 1 1 320px; margin: 0; }
+.banner button { min-height: 44px; padding: 6px 14px; font-weight: 800; color: var(--ink); background: transparent; border: 2px solid var(--ink); border-radius: 4px; }
+.banner button:hover { background: var(--parchment-2); }
+.banner :focus-visible { outline-color: var(--crimson-deep); }
+.loading { max-width: 1416px; margin: 40px auto; padding: 0 32px; color: var(--muted); font-weight: 700; }
+
+.layout { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); gap: 44px; max-width: 1480px; margin: 0 auto; padding: 14px 32px 48px; align-items: start; }
+.layout.single { grid-template-columns: minmax(0, 1fr); max-width: 900px; }
+.art { position: sticky; top: 14px; }
+.art :deep(.hero-art) { filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .5)); }
+.caption { margin: 10px 0 0; font-size: .85rem; color: var(--muted); }
+
+.kicker { margin: 0 0 8px; font-size: .85rem; font-weight: 800; letter-spacing: .2em; text-transform: uppercase; color: var(--spark); }
+h1 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(3rem, 6vw, 5.2rem); line-height: .92; letter-spacing: .015em; text-transform: uppercase; }
+h1 span { color: var(--gold); text-shadow: 4px 4px 0 var(--crimson-deep); }
+.lede { max-width: 58ch; margin: 12px 0 16px; font-size: 1.1rem; color: var(--muted); }
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 14px; padding: 10px 0; border-block: 2px solid var(--steel-3); }
+.toolbar h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 1.9rem; letter-spacing: .05em; text-transform: uppercase; color: var(--gold); }
+.toolbar h2:focus { outline: none; }
+.count { margin: 0; flex: 1; color: var(--muted); font-weight: 600; }
+.sort { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.sort select { min-height: 46px; padding: 6px 12px; color: var(--text); background: var(--steel); border: 2px solid var(--steel-3); border-radius: 4px; }
+.sort select:hover:not(:disabled) { border-color: var(--gold-deep); }
+
+.cats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.cats button { min-height: 44px; padding: 6px 14px; font-weight: 700; color: var(--text); background: var(--steel); border: 2px solid var(--steel-3); border-radius: 999px; }
+.cats button:hover { border-color: var(--gold-deep); }
+.cats button[aria-pressed='true'] { color: var(--ink); background: var(--gold); border-color: var(--ink); box-shadow: 0 0 0 2px var(--gold-deep); }
+
+.shelf { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin: 0; padding: 0; list-style: none; }
+
+.state { padding: 28px; color: var(--ink); background: var(--parchment); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 0 0 0 2px var(--gold-deep); }
+.state h3 { margin: 0 0 6px; font-family: var(--font-display); font-weight: 400; font-size: 1.8rem; letter-spacing: .03em; text-transform: uppercase; }
+.state p { margin: 0 0 16px; font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.actions button { min-height: 48px; padding: 8px 18px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; border: 3px solid var(--ink); border-radius: 4px; }
+.actions .solid { color: #fff; background: var(--crimson-deep); }
+.actions .outline { color: var(--ink); background: transparent; }
+.state :focus-visible { outline-color: var(--crimson-deep); }
+
+.steps { max-width: 1416px; margin: 0 auto; padding: 28px 32px; border-top: 2px solid var(--steel-3); }
+.steps h2 { margin: 0 0 16px; font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; letter-spacing: .05em; text-transform: uppercase; color: var(--gold); }
+.steps ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin: 0; padding: 0; list-style: none; }
+.steps li { display: flex; gap: 14px; padding: 16px; background: var(--steel); border: 2px solid var(--steel-3); border-radius: 4px; }
+.steps li > span { flex: none; display: grid; place-items: center; width: 44px; height: 44px; font-family: var(--font-display); font-size: 1.4rem; color: var(--gold); border: 2px solid var(--gold); border-radius: 50%; outline: 2px dashed var(--gold-deep); outline-offset: 3px; }
+.steps h3 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 1.25rem; letter-spacing: .04em; text-transform: uppercase; }
+.steps p { margin: 2px 0 0; color: var(--muted); }
+
+.foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; max-width: 1416px; margin: 0 auto; padding: 20px 32px 40px; color: var(--muted); border-top: 2px solid var(--steel-3); }
+.foot p { margin: 0; max-width: 70ch; font-size: .95rem; }
+.foot button { min-height: 44px; padding: 6px 16px; font-weight: 800; color: var(--text); background: transparent; border: 2px solid var(--steel-3); border-radius: 4px; }
+.foot button:hover { border-color: var(--gold); }
+
+.toast { position: fixed; left: 50%; bottom: 24px; z-index: 40; margin: 0; padding: 10px 20px; font-weight: 800; color: var(--ink); background: var(--gold); border: 3px solid var(--ink); border-radius: 4px; transform: translateX(-50%); max-width: calc(100vw - 32px); text-align: center; }
+.toast:empty { display: none; }
+
+@media (max-width: 1180px) {
+  .layout { grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 28px; }
+  .shelf { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .top { grid-template-columns: 1fr auto; padding: 12px 18px; }
+  .search { grid-column: 1 / -1; grid-row: 2; max-width: none; }
+  .search-spacer { display: none; }
+  .layout { grid-template-columns: 1fr; padding: 10px 18px 36px; }
+  .art { position: static; max-width: 230px; margin: 0 auto; }
+  .caption { text-align: center; }
+  .steps, .foot { padding-inline: 18px; }
+  .steps ol { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .shelf { grid-template-columns: 1fr; }
+  .wordmark { font-size: 1.4rem; }
+  .wordmark small { letter-spacing: .18em; }
+  .cart-label { display: none; }
+  .cart-btn { padding-inline: 14px; }
+  .nav-btn { padding-inline: 10px; font-size: .9rem; }
+  .actions-top { gap: 8px; }
+  .sort { width: 100%; }
+  .sort select { flex: 1; }
 }
 </style>

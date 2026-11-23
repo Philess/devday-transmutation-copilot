@@ -58,23 +58,25 @@ watch(selected, () => { page.value = 1 })
 </template>
 
 <style scoped>
-.data-view { min-height: 70vh; padding: 2rem clamp(1rem, 4vw, 3rem) 4rem; }
-.view-heading { max-width: 850px; margin: 1rem auto 2rem; color: #f4eedf; }
-.eyebrow { color: #dfbd79; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
-h1 { margin: 0.35rem 0; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2rem, 5vw, 3.2rem); }
-.view-heading p:last-child { max-width: 60ch; color: #d3d7dc; line-height: 1.6; }
-.data-panel { max-width: 1200px; box-sizing: border-box; margin: 0 auto; padding: clamp(1rem, 3vw, 1.75rem); border: 1px solid #c8c0b1; background: #f5f0e5; color: #172332; }
-.data-note { margin-top: 0; padding: 0.8rem 1rem; border: 1px solid #c9a95e; background: #e8dfd1; line-height: 1.5; }
-.date-range { color: #49515b; }
-label { display: block; margin: 1.3rem 0 0.4rem; font-weight: 800; }
-select, button { min-height: 44px; padding: 0.6rem 0.8rem; border-radius: 0; font: inherit; }
-select { max-width: 100%; border: 1px solid #69717a; background: #fffdf8; color: #182332; }
-button { border: 1px solid #173047; background: #173047; color: white; font-weight: 700; cursor: pointer; }
-button:hover:not(:disabled) { background: #304a60; }
-button:disabled { opacity: 0.55; cursor: not-allowed; }
+.data-view { min-height: 70vh; max-width: 1480px; margin: 0 auto; padding: 1rem clamp(1rem, 4vw, 2rem) 3rem; }
+.view-heading { max-width: 850px; margin: 1rem 0 1.6rem; color: var(--text); }
+.eyebrow { margin: 0; color: var(--spark); font-size: 0.85rem; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; }
+h1 { margin: 0.35rem 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(2.4rem, 5vw, 4rem); line-height: .95; letter-spacing: .02em; text-transform: uppercase; }
+.view-heading p:last-child { max-width: 60ch; color: var(--muted); line-height: 1.6; }
+.data-panel { position: relative; box-sizing: border-box; padding: clamp(1rem, 3vw, 1.75rem); color: var(--ink); background: linear-gradient(160deg, var(--parchment), var(--parchment-2)); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 0 0 0 2px var(--gold-deep), 0 14px 28px rgba(0, 0, 0, .45); }
+.data-note { margin-top: 0; padding: 0.8rem 1rem; border: 2px dashed var(--gold-deep); background: #efe2c0; line-height: 1.5; }
+.date-range { color: #3b3a35; font-weight: 600; }
+label { display: block; margin: 1.3rem 0 0.4rem; font-weight: 800; letter-spacing: .04em; }
+select, button { min-height: 44px; padding: 0.6rem 0.9rem; border-radius: 4px; font: inherit; }
+select { max-width: 100%; border: 3px solid var(--ink); background: #fffaf0; color: var(--ink); }
+button { border: 3px solid var(--ink); background: var(--crimson-deep); color: #fff; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
+button:hover:not(:disabled) { background: var(--crimson); }
+button:disabled { color: #45505e; background: #c9bd9f; box-shadow: none; cursor: not-allowed; }
 .pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 0.7rem; margin: 1rem 0; }
-.pagination p { flex: 1 1 18rem; margin: 0; }
-pre { max-height: 65vh; overflow: auto; margin: 0; border: 1px solid #c7c0b5; padding: 1rem; background: #fffdf8; font-size: 0.82rem; tab-size: 2; }
+.pagination p { flex: 1 1 18rem; margin: 0; font-weight: 600; }
+pre { max-height: 65vh; overflow: auto; margin: 0; border: 3px solid var(--ink); border-radius: 3px; padding: 1rem; color: #e7eef8; background: var(--ink); font-size: 0.85rem; tab-size: 2; }
+.data-panel :focus-visible { outline-color: var(--crimson-deep); }
+pre:focus-visible { outline-color: var(--gold); }
 code { font-family: Consolas, 'Courier New', monospace; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .pagination button { flex: 1; } }
 </style>

@@ -4,12 +4,11 @@ import { rays } from './alchemy'
 
 const INK = '#0d1117'
 const burst = rays(260, 340, 36, 200, 800, 0.04)
-const grooves = [226, 208, 190, 172, 154]
-const speakerRings = [56, 40, 22]
+const rings = [226, 208, 190, 172, 154]
 </script>
 
 <template>
-  <svg class="hero-art" viewBox="0 0 520 660" role="img" aria-label="Illustration of Zap, the Transmute Records mascot: a singing character in a red coat and headphones standing in front of a glowing transmutation circle shaped like a vinyl record" xmlns="http://www.w3.org/2000/svg">
+  <svg class="hero-art" viewBox="0 0 520 660" role="img" aria-label="Illustration originale de Zap, la mascotte de Central Alchemy Supply : une apprentie en manteau rouge, lunettes de laboratoire relevées, devant un cercle de transmutation lumineux" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <clipPath id="hero-panel"><path d="M10 6H514L504 650L6 640Z" /></clipPath>
       <clipPath id="hero-mouth"><path d="M214 392Q260 480 306 392Q260 372 214 392Z" /></clipPath>
@@ -28,10 +27,10 @@ const speakerRings = [56, 40, 22]
       <rect width="520" height="660" fill="url(#hero-dots)" mask="url(#hero-corner)" opacity=".55" />
       <rect width="520" height="660" fill="url(#hero-dots-ink)" mask="url(#hero-bottom)" opacity=".7" />
 
-      <!-- record-shaped transmutation circle -->
+      <!-- transmutation circle -->
       <circle cx="260" cy="340" r="250" fill="url(#hero-glow)" />
       <circle cx="260" cy="340" r="236" fill="#12233a" stroke="#f0b429" stroke-width="5" />
-      <g fill="none" stroke="#2b4666" stroke-width="3"><circle v-for="r in grooves" :key="r" cx="260" cy="340" :r="r" /></g>
+      <g fill="none" stroke="#2b4666" stroke-width="3"><circle v-for="r in rings" :key="r" cx="260" cy="340" :r="r" /></g>
       <CircleGlyph :cx="260" :cy="340" :r="236" :n="6" :k="2" color="#f0b429" :width="4" />
 
       <!-- transmutation lightning -->
@@ -39,12 +38,6 @@ const speakerRings = [56, 40, 22]
         <path d="M26 96L92 152L70 164L140 236" stroke="#7fe7ff" stroke-width="9" /><path d="M26 96L92 152L70 164L140 236" stroke="#fff" stroke-width="3" />
         <path d="M498 560L430 508L452 498L384 430" stroke="#7fe7ff" stroke-width="9" /><path d="M498 560L430 508L452 498L384 430" stroke="#fff" stroke-width="3" />
         <path d="M500 150L440 190L462 200L410 250" stroke="#7fe7ff" stroke-width="7" /><path d="M500 150L440 190L462 200L410 250" stroke="#fff" stroke-width="2.5" />
-      </g>
-
-      <!-- sound arcs -->
-      <g fill="none" stroke="#f0b429" stroke-width="7" stroke-linecap="round">
-        <path v-for="r in [60, 100]" :key="`l${r}`" :d="`M${96 - r * 0.5} ${340 - r * 0.87} A${r} ${r} 0 0 0 ${96 - r * 0.5} ${340 + r * 0.87}`" />
-        <path v-for="r in [60, 100]" :key="`r${r}`" :d="`M${424 + r * 0.5} ${340 - r * 0.87} A${r} ${r} 0 0 1 ${424 + r * 0.5} ${340 + r * 0.87}`" />
       </g>
 
       <!-- coat -->
@@ -80,25 +73,29 @@ const speakerRings = [56, 40, 22]
         <path d="M214 232L222 252" /><path d="M300 240L308 224" />
       </g>
 
-      <!-- headphones -->
-      <path d="M116 340C96 110 424 110 404 340" fill="none" :stroke="INK" stroke-width="38" stroke-linecap="round" />
-      <path d="M116 340C96 110 424 110 404 340" fill="none" stroke="#f0b429" stroke-width="24" stroke-linecap="round" />
-      <g :stroke="INK" stroke-width="7" stroke-linejoin="round">
-        <rect x="76" y="290" width="62" height="116" rx="26" fill="#d7263d" />
-        <rect x="382" y="290" width="62" height="116" rx="26" fill="#d7263d" />
+      <!-- goggles pushed up on the forehead -->
+      <path d="M130 282Q260 192 390 282" fill="none" :stroke="INK" stroke-width="34" stroke-linecap="round" />
+      <path d="M130 282Q260 192 390 282" fill="none" stroke="#a51a2d" stroke-width="20" stroke-linecap="round" />
+      <g :stroke="INK" stroke-width="7">
+        <circle cx="208" cy="236" r="40" fill="#f0b429" />
+        <circle cx="312" cy="236" r="40" fill="#f0b429" />
+        <circle cx="208" cy="236" r="27" fill="#7fe7ff" />
+        <circle cx="312" cy="236" r="27" fill="#7fe7ff" />
+        <path d="M246 236H274" stroke-width="9" stroke-linecap="round" />
       </g>
-      <CircleGlyph :cx="107" :cy="348" :r="22" :n="6" :k="2" color="#f0b429" :width="2.4" />
-      <CircleGlyph :cx="413" :cy="348" :r="22" :n="6" :k="2" color="#f0b429" :width="2.4" />
+      <path d="M194 222L210 214M298 222L314 214" stroke="#fff" stroke-width="6" stroke-linecap="round" />
     </g>
     <path d="M10 6H514L504 650L6 640Z" fill="none" :stroke="INK" stroke-width="8" />
 
-    <!-- inset panel: speaker -->
+    <!-- inset panel: flask and chalk -->
     <g>
       <path d="M26 440L186 424L196 560L30 584Z" fill="#2b3f55" :stroke="INK" stroke-width="7" />
       <g transform="translate(110 504) rotate(-5)">
         <path d="M-70 -64H70V64H-70Z" fill="#f4ead2" :stroke="INK" stroke-width="5" transform="rotate(-1)" />
-        <circle v-for="(r, i) in speakerRings" :key="r" :r="r" :fill="i === 0 ? '#0d1117' : i === 1 ? '#d7263d' : '#f0b429'" :stroke="INK" stroke-width="4" />
-        <circle r="7" :fill="INK" />
+        <path d="M-14 -46H14V-12L40 40Q44 50 34 50H-34Q-44 50 -40 40L-14 -12Z" fill="#eaf7fb" :stroke="INK" stroke-width="4" stroke-linejoin="round" />
+        <path d="M-30 20Q-15 12 0 20T30 20L38 42Q40 46 34 46H-34Q-40 46 -38 42Z" fill="#d7263d" />
+        <circle cx="-6" cy="32" r="4" fill="#fff" /><circle cx="12" cy="36" r="3" fill="#fff" />
+        <rect x="-20" y="-56" width="40" height="11" rx="3" fill="#9db2c8" :stroke="INK" stroke-width="3" />
       </g>
     </g>
 
