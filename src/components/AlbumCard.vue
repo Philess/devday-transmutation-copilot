@@ -1,40 +1,7 @@
-<template>
-  <div class="album-card">
-    <div class="album-image">
-      <img
-        :src="album.image_url"
-        :alt="album.title"
-        @error="handleImageError"
-        loading="lazy"
-      />
-      <div class="play-overlay">
-        <div class="play-button">▶</div>
-      </div>
-    </div>
-
-    <div class="album-info">
-      <h3 class="album-title">{{ album.title }}</h3>
-      <p class="album-artist">{{ album.artist }}</p>
-      <div class="album-price">
-        <span class="price">${{ album.price.toFixed(2) }}</span>
-      </div>
-    </div>
-
-    <div class="album-actions">
-      <button class="btn btn-primary" @click="$emit('add', album)">Add to Cart</button>
-      <button class="btn btn-secondary" disabled title="Workshop exercise: implement album previews">Preview</button>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import type { Album } from '../types/album'
 
-interface Props {
-  album: Album
-}
-
-defineProps<Props>()
+defineProps<{ album: Album }>()
 defineEmits<{ add: [album: Album] }>()
 
 const handleImageError = (event: Event): void => {
@@ -46,160 +13,36 @@ const handleImageError = (event: Event): void => {
 }
 </script>
 
+<template>
+  <article class="album-card">
+    <div class="album-art">
+      <img :src="album.image_url" :alt="`Cover of ${album.title}`" @error="handleImageError" loading="lazy">
+      <span class="album-stamp">Archive · {{ String(album.id).padStart(2, '0') }}</span>
+    </div>
+    <div class="album-copy">
+      <p class="album-category">Album collection</p>
+      <h3>{{ album.title }}</h3>
+      <p class="album-artist">{{ album.artist }}</p>
+      <div class="album-footer">
+        <p class="price">${{ album.price.toFixed(2) }}</p>
+        <button type="button" class="add-button" :aria-label="`Add ${album.title} to cart`" @click="$emit('add', album)">Add to cart</button>
+      </div>
+    </div>
+  </article>
+</template>
+
 <style scoped>
-.album-card {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 15px;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-}
-
-.album-card:hover {
-  transform: translateY(-10px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-}
-
-.album-image {
-  position: relative;
-  overflow: hidden;
-}
-
-.album-image img {
-  width: 100%;
-  height: 250px;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.album-card:hover .album-image img {
-  transform: scale(1.1);
-}
-
-.play-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.album-card:hover .play-overlay {
-  opacity: 1;
-}
-
-.play-button {
-  width: 60px;
-  height: 60px;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  color: #667eea;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.play-button:hover {
-  background: white;
-  transform: scale(1.1);
-}
-
-.album-info {
-  padding: 1.5rem;
-}
-
-.album-title {
-  font-size: 1.3rem;
-  font-weight: bold;
-  color: #333;
-  margin: 0 0 0.5rem 0;
-  line-height: 1.3;
-}
-
-.album-artist {
-  color: #666;
-  font-size: 1rem;
-  margin: 0 0 1rem 0;
-}
-
-.album-price {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.price {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #667eea;
-}
-
-.album-actions {
-  padding: 0 1.5rem 1.5rem;
-  display: flex;
-  gap: 0.75rem;
-}
-
-.btn {
-  flex: 1;
-  padding: 0.75rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #667eea;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #5a6fd8;
-  transform: translateY(-2px);
-}
-
-.btn-secondary {
-  background: transparent;
-  color: #667eea;
-  border: 2px solid #667eea;
-}
-
-.btn-secondary:hover {
-  background: #667eea;
-  color: white;
-  transform: translateY(-2px);
-}
-
-@media (max-width: 768px) {
-  .album-info {
-    padding: 1rem;
-  }
-
-  .album-actions {
-    padding: 0 1rem 1rem;
-    flex-direction: column;
-  }
-
-  .btn {
-    width: 100%;
-  }
-}
+.album-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid #c8c0b1; background: #f5f0e5; box-shadow: 0 8px 18px #09111c55; }
+.album-art { position: relative; display: grid; place-items: center; min-height: 225px; padding: 1rem; background: linear-gradient(135deg, transparent 48%, #b8873c22 49%, #b8873c22 50%, transparent 51%), #111c2a; }
+.album-art img { width: min(100%, 190px); aspect-ratio: 1; object-fit: cover; box-shadow: 0 8px 20px #0007; }
+.album-stamp { position: absolute; top: 0.75rem; right: 0.75rem; padding: 0.3rem 0.5rem; border: 1px solid #c49a52; background: #172433; color: #f1d49a; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.album-copy { display: flex; flex: 1; flex-direction: column; padding: 1.15rem; }
+.album-category { margin: 0 0 0.45rem; color: #7e2931; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+h3 { margin: 0; color: #182332; font-family: Georgia, 'Times New Roman', serif; font-size: 1.25rem; line-height: 1.25; overflow-wrap: anywhere; }
+.album-artist { margin: 0.55rem 0 1.1rem; color: #48505a; font-size: 0.9rem; }
+.album-footer { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: auto; padding-top: 0.8rem; border-top: 1px solid #d5ccbd; }
+.price { margin: 0; color: #172638; font-size: 1.15rem; font-weight: 800; white-space: nowrap; }
+.add-button { min-height: 44px; padding: 0.65rem 0.85rem; border: 1px solid #7e2931; background: #7e2931; color: #fffaf0; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+.add-button:hover { background: #612029; }
+@media (max-width: 440px) { .album-footer { align-items: stretch; flex-direction: column; } .add-button { width: 100%; } }
 </style>

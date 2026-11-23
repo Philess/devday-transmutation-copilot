@@ -1,6 +1,6 @@
 # Boutique d'albums — atelier Copilot
 
-Cette application Vue 3 / TypeScript est le point de départ d'un atelier : la boutique et l'espace administrateur exposent des données fictives brutes, **sans dashboard**. Les participants construisent celui-ci pendant la démonstration à partir de la réunion obtenue via Work IQ.
+Central Alchemy Records est une boutique d'albums au style inspiré de l'alchimie. Cette application Vue 3 / TypeScript est le point de départ d'un atelier : la boutique et l'espace administrateur exposent des données fictives brutes, **sans dashboard**. Les participants construisent celui-ci pendant la démonstration à partir de la réunion obtenue via Work IQ.
 
 Le jeu de données généré couvre 2024–2025 : 30 albums, 10 magasins physiques, une boutique en ligne distincte, 600 clients et 9 937 commandes. La boutique présente les albums et permet de créer des commandes locales de démonstration, sans paiement réel. L'espace administrateur permet de parcourir les données brutes en lecture seule.
 
