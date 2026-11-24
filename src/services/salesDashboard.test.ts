@@ -37,21 +37,30 @@ const makeOrder = (
   id: string,
   date: string,
   locationId: string,
-  lines: Array<{ productId: number; quantity: number; unitPriceCents: number }>,
+  lines: Array<{
+    productId: number
+    quantity: number
+    unitPriceCents: number
+    listUnitPriceCents?: number
+    promotionCode?: string | null
+  }>,
   customerId = 'c1'
 ): SalesOrder => ({
   id,
   date,
   customerId,
   locationId,
-  lines: lines.map(({ productId, quantity, unitPriceCents }) => {
+  lines: lines.map(({ productId, quantity, unitPriceCents, listUnitPriceCents, promotionCode }) => {
     const product = makeProduct(productId)
+    const historicalListPrice = listUnitPriceCents ?? Math.max(product.priceCents, unitPriceCents)
     return {
       product: { id: product.id, name: product.name, category: product.category },
       quantity,
-      listUnitPriceCents: product.priceCents,
+      listUnitPriceCents: historicalListPrice,
       unitPriceCents,
-      promotionCode: unitPriceCents === product.priceCents ? null : 'TEST'
+      promotionCode: promotionCode === undefined
+        ? (unitPriceCents === historicalListPrice ? null : 'TEST')
+        : promotionCode
     }
   })
 })
@@ -82,10 +91,10 @@ describe('computeSalesDashboard', () => {
 
   it('uses historical discounted line prices and intersects inclusive date, channel, and location filters', () => {
     const data = makeData([
-      makeOrder('start', '2025-03-01', 'store-1', [{ productId: 1, quantity: 2, unitPriceCents: 49 }]),
-      makeOrder('online', '2025-03-31', 'online', [{ productId: 1, quantity: 1, unitPriceCents: 200 }], 'c2'),
-      makeOrder('after', '2025-04-01', 'store-1', [{ productId: 1, quantity: 1, unitPriceCents: 300 }], 'c3')
-    ], [makeProduct(1, 9999)])
+      makeOrder('start', '2025-03-01', 'store-1', [{ productId: 1, quantity: 2, unitPriceCents: 49, listUnitPriceCents: 200 }]),
+      makeOrder('online', '2025-03-31', 'online', [{ productId: 1, quantity: 1, unitPriceCents: 200, listUnitPriceCents: 1000 }], 'c2'),
+      makeOrder('after', '2025-04-01', 'store-1', [{ productId: 1, quantity: 1, unitPriceCents: 300, listUnitPriceCents: 400 }], 'c3')
+    ], [makeProduct(1, 25)])
     const before = JSON.stringify(data)
 
     const allSales = computeSalesDashboard(data)
@@ -112,6 +121,35 @@ describe('computeSalesDashboard', () => {
     expect(result.topProducts[0]).toMatchObject({ productId: 1, quantity: 2, totalCents: 98 })
     expect(result.monthly).toEqual([{ month: '2025-03', orderCount: 1, totalCents: 98 }])
     expect(JSON.stringify(data)).toBe(before)
+  })
+
+  it('validates historical line prices and promotion codes without using the current catalog price', () => {
+    const validData = makeData([
+      makeOrder('discounted', '2025-03-01', 'store-1', [{
+        productId: 1,
+        quantity: 1,
+        unitPriceCents: 80,
+        listUnitPriceCents: 120,
+        promotionCode: 'TEST'
+      }])
+    ], [makeProduct(1, 50)])
+
+    expect(computeSalesDashboard(validData).kpis.totalCents).toBe(80)
+
+    const invalidCases = [
+      (data: SalesData) => { data.orders[0]!.lines[0]!.listUnitPriceCents = 0 },
+      (data: SalesData) => { data.orders[0]!.lines[0]!.unitPriceCents = 0 },
+      (data: SalesData) => { data.orders[0]!.lines[0]!.unitPriceCents = 121 },
+      (data: SalesData) => { Object.assign(data.orders[0]!.lines[0]!, { promotionCode: 123 }) },
+      (data: SalesData) => { Reflect.deleteProperty(data.orders[0]!.lines[0]!, 'listUnitPriceCents') },
+      (data: SalesData) => { Reflect.deleteProperty(data.orders[0]!.lines[0]!, 'promotionCode') }
+    ]
+
+    for (const invalidate of invalidCases) {
+      const data = structuredClone(validData)
+      invalidate(data)
+      expectErrorCode(() => computeSalesDashboard(data), 'INVALID_DATA')
+    }
   })
 
   it('returns an explicit empty result when the selected location conflicts with the channel', () => {

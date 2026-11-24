@@ -37,9 +37,6 @@ const isValidDate = (value: unknown): value is string => {
   return day! >= 1 && day! <= daysInMonth[month! - 1]!
 }
 
-const isSafeNonNegativeInteger = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-
 const isSafePositiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 
@@ -62,12 +59,12 @@ const validateData = (data: SalesData) => {
   if (!isRecord(data) || !Array.isArray(data.products) || !Array.isArray(data.locations)
     || !Array.isArray(data.customers) || !Array.isArray(data.orders)) invalidData()
 
-  const products = new Set<number>()
+  const products = new Map<number, { name: string; category: string }>()
   for (const product of data.products) {
     if (!isRecord(product) || !isSafePositiveInteger(product.id)
       || typeof product.name !== 'string' || typeof product.category !== 'string'
       || products.has(product.id)) invalidData()
-    products.add(product.id)
+    products.set(product.id, { name: product.name, category: product.category })
   }
 
   const locations = new Map<string, SalesLocation>()
@@ -98,10 +95,15 @@ const validateData = (data: SalesData) => {
       if (!isRecord(line) || !isRecord(line.product) || !isSafePositiveInteger(line.product.id)
         || !products.has(line.product.id) || typeof line.product.name !== 'string'
         || typeof line.product.category !== 'string' || !isSafePositiveInteger(line.quantity)
-        || !isSafeNonNegativeInteger(line.unitPriceCents)) invalidData()
+        || !isSafePositiveInteger(line.listUnitPriceCents) || !isSafePositiveInteger(line.unitPriceCents)
+        || line.unitPriceCents > line.listUnitPriceCents
+        || !(line.promotionCode === null || typeof line.promotionCode === 'string')) invalidData()
+      const catalogProduct = products.get(line.product.id)!
+      if (line.product.name !== catalogProduct.name || line.product.category !== catalogProduct.category) invalidData()
     }
     try {
       orderTotalCents(order.lines.map(line => ({ quantity: line.quantity, unitPriceCents: line.unitPriceCents })))
+      orderTotalCents(order.lines.map(line => ({ quantity: line.quantity, unitPriceCents: line.listUnitPriceCents })))
     } catch (error) {
       if (error instanceof RangeError) unrepresentableAmount()
       throw error
