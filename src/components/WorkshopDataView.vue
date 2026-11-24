@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import SalesDashboard from './SalesDashboard.vue'
 import type { SalesDataset } from '../types/sales'
 
 const props = defineProps<{ dataset: SalesDataset }>()
+const activePanel = ref<'dashboard' | 'raw'>('dashboard')
 const collections: { key: keyof SalesDataset; label: string }[] = [
   { key: 'metadata', label: 'Métadonnées' },
   { key: 'products', label: 'Catalogue' },
@@ -33,12 +35,19 @@ watch(selected, () => { page.value = 1 })
 <template>
   <main class="data-view">
     <header class="view-heading">
-      <p class="eyebrow">Archives · accès lecture seule</p>
+      <p class="eyebrow">Archives · données locales</p>
       <h1>Registre d’approvisionnement</h1>
-      <p>Consultez les données fictives brutes du projet. Les commandes historiques sont conservées dans ce navigateur.</p>
+      <p>Consultez la synthèse des commandes fictives ou les données brutes conservées dans ce navigateur.</p>
     </header>
 
-    <section class="data-panel" aria-label="Collections de données brutes">
+    <nav class="register-tabs" aria-label="Vue du registre">
+      <button type="button" :aria-pressed="activePanel === 'dashboard'" @click="activePanel = 'dashboard'">Tableau de bord</button>
+      <button type="button" :aria-pressed="activePanel === 'raw'" @click="activePanel = 'raw'">Données brutes</button>
+    </nav>
+
+    <SalesDashboard v-if="activePanel === 'dashboard'" :data="dataset" />
+
+    <section v-else class="data-panel" aria-label="Collections de données brutes">
       <p class="data-note"><strong>Démonstration locale.</strong> Aucun paiement ni service distant n’est connecté. Les montants des lignes sont en cents USD.</p>
       <p class="date-range">Période des données : {{ dataset.metadata.startDate }} – {{ dataset.metadata.endDate }} · {{ dataset.metadata.currency }} · UTC</p>
 
@@ -63,6 +72,10 @@ watch(selected, () => { page.value = 1 })
 .eyebrow { margin: 0; color: var(--spark); font-size: 0.85rem; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; }
 h1 { margin: 0.35rem 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(2.4rem, 5vw, 4rem); line-height: .95; letter-spacing: .02em; text-transform: uppercase; }
 .view-heading p:last-child { max-width: 60ch; color: var(--muted); line-height: 1.6; }
+.register-tabs { display: flex; flex-wrap: wrap; gap: .65rem; margin: 0 0 1rem; }
+.register-tabs button { min-height: 44px; padding: .55rem 1rem; color: var(--text); background: var(--steel); border: 2px solid var(--spark); border-radius: 3px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.register-tabs button[aria-pressed="true"] { color: var(--ink); background: var(--spark); box-shadow: 3px 3px 0 var(--ink); }
+.register-tabs button:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .data-panel { position: relative; box-sizing: border-box; padding: clamp(1rem, 3vw, 1.75rem); color: var(--ink); background: linear-gradient(160deg, var(--parchment), var(--parchment-2)); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 0 0 0 2px var(--gold-deep), 0 14px 28px rgba(0, 0, 0, .45); }
 .data-note { margin-top: 0; padding: 0.8rem 1rem; border: 2px dashed var(--gold-deep); background: #efe2c0; line-height: 1.5; }
 .date-range { color: #3b3a35; font-weight: 600; }
