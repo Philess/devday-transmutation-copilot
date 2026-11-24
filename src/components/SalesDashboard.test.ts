@@ -88,6 +88,20 @@ describe('SalesDashboard', () => {
     expect(wrapper.text()).not.toContain('$')
   })
 
+  it('formats the largest safe cent amount exactly across every widget', () => {
+    const cents = Number.MAX_SAFE_INTEGER
+    vi.mocked(computeSalesDashboard).mockReturnValue({
+      kpis: { orderCount: 1, totalCents: cents, averageOrderCents: cents },
+      byLocation: [{ locationId: 'store-01', locationName: 'Magasin Central', channel: 'store', orderCount: 1, totalCents: cents }],
+      byChannel: [{ channel: 'store', orderCount: 1, totalCents: cents }],
+      topProducts: [{ productId: 7, productName: 'Alambic de cuivre', category: 'Instruments', quantity: 1, totalCents: cents }],
+      monthly: [{ month: '2025-03', orderCount: 1, totalCents: cents }]
+    })
+    const wrapper = mount(SalesDashboard, { props: { data } })
+
+    expect(wrapper.text().match(/\$90,071,992,547,409\.91/g)).toHaveLength(6)
+  })
+
   it('recomputes when the source dataset changes', async () => {
     const updated: SalesData = { ...data, orders: [{ id: 'new-order', date: '2025-03-15', customerId: 'c1', locationId: 'store-01', lines: [] }] }
     const wrapper = mount(SalesDashboard, { props: { data } })

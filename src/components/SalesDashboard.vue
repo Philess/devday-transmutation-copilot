@@ -4,10 +4,19 @@ import SalesDashboardFilters from './SalesDashboardFilters.vue'
 import type { SalesData, SalesChannel } from '../types/sales'
 import type { SalesDashboardFilters as DashboardFilters, SalesDashboardResult } from '../types/salesDashboard'
 import { computeSalesDashboard } from '../services/salesDashboard'
-import { formatUSD } from '../services/checkout'
 
 const props = defineProps<{ data: SalesData }>()
 const filters = ref<DashboardFilters>({})
+
+const formatDashboardUSD = (cents: number): string => {
+  if (!Number.isSafeInteger(cents) || cents < 0) {
+    throw new RangeError('Le montant ne peut pas être affiché précisément.')
+  }
+  const exactCents = BigInt(cents)
+  const dollars = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(exactCents / 100n)
+  const remainder = String(exactCents % 100n).padStart(2, '0')
+  return `$${dollars}.${remainder}`
+}
 
 const dashboard = computed((): { result: SalesDashboardResult | null; error: string | null } => {
   try {
@@ -55,7 +64,7 @@ const channelLabel = (channel: SalesChannel): string =>
       <section class="kpis" aria-label="Indicateurs des commandes sélectionnées">
         <article class="kpi kpi-total">
           <p>Ventes totales</p>
-          <strong>{{ formatUSD(dashboard.result.kpis.totalCents) }}</strong>
+          <strong>{{ formatDashboardUSD(dashboard.result.kpis.totalCents) }}</strong>
         </article>
         <article class="kpi">
           <p>Commandes</p>
@@ -63,7 +72,7 @@ const channelLabel = (channel: SalesChannel): string =>
         </article>
         <article class="kpi">
           <p>Panier moyen</p>
-          <strong>{{ dashboard.result.kpis.averageOrderCents === null ? 'Non calculé' : formatUSD(dashboard.result.kpis.averageOrderCents) }}</strong>
+          <strong>{{ dashboard.result.kpis.averageOrderCents === null ? 'Non calculé' : formatDashboardUSD(dashboard.result.kpis.averageOrderCents) }}</strong>
         </article>
       </section>
 
@@ -82,7 +91,7 @@ const channelLabel = (channel: SalesChannel): string =>
               <span class="channel-mark" :class="`channel-${channel.channel}`" aria-hidden="true"></span>
               <span class="channel-name">{{ channelLabel(channel.channel) }}</span>
               <span class="channel-orders">{{ channel.orderCount }} {{ channel.orderCount === 1 ? 'commande' : 'commandes' }}</span>
-              <strong>{{ formatUSD(channel.totalCents) }}</strong>
+              <strong>{{ formatDashboardUSD(channel.totalCents) }}</strong>
             </li>
           </ul>
           <p v-else class="widget-empty">Aucune vente par canal pour cette sélection.</p>
@@ -103,7 +112,7 @@ const channelLabel = (channel: SalesChannel): string =>
                   <th scope="row">{{ location.locationName }}</th>
                   <td>{{ channelLabel(location.channel) }}</td>
                   <td>{{ location.orderCount }}</td>
-                  <td>{{ formatUSD(location.totalCents) }}</td>
+                  <td>{{ formatDashboardUSD(location.totalCents) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -126,7 +135,7 @@ const channelLabel = (channel: SalesChannel): string =>
                   <td class="rank">{{ String(index + 1).padStart(2, '0') }}</td>
                   <th scope="row">{{ product.productName }}<span class="product-category">{{ product.category }}</span></th>
                   <td>{{ product.quantity }}</td>
-                  <td>{{ formatUSD(product.totalCents) }}</td>
+                  <td>{{ formatDashboardUSD(product.totalCents) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -143,7 +152,7 @@ const channelLabel = (channel: SalesChannel): string =>
             <li v-for="month in monthlyBars" :key="month.month">
               <span class="month-label">{{ month.label }}</span>
               <span class="bar-track" aria-hidden="true"><span class="bar-fill" :style="{ width: `${month.width}%` }"></span></span>
-              <strong>{{ formatUSD(month.totalCents) }}</strong>
+              <strong>{{ formatDashboardUSD(month.totalCents) }}</strong>
             </li>
           </ol>
           <p v-else class="widget-empty">Aucune vente mensuelle pour cette sélection.</p>
