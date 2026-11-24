@@ -1,6 +1,6 @@
 # Central Alchemy Supply
 
-Central Alchemy Supply est une boutique de démonstration Vue 3 / TypeScript et le point de départ d’un atelier de développement agentique. Le dashboard de ventes est à construire par les participants pendant la session : ce projet fournit la boutique et les données locales, pas une analyse prête à l’emploi.
+Central Alchemy Supply est une boutique de démonstration Vue 3 / TypeScript et le point de départ d’un atelier de développement agentique. Le dashboard de ventes est à construire : ce projet fournit la boutique et les données locales, pas une analyse prête à l’emploi.
 
 ## Contenu
 
