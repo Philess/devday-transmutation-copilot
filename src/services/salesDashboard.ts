@@ -83,6 +83,8 @@ const validateData = (data: SalesData) => {
     customers.add(customer.id)
   }
 
+  // youpi ytest de restack
+
   const orderIds = new Set<string>()
   for (const order of data.orders) {
     if (!isRecord(order) || typeof order.id !== 'string' || order.id.length === 0
