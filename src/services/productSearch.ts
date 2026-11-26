@@ -1,5 +1,5 @@
 import type { Product } from '../types/product'
-
+// this is test 2
 export const filterProducts = (products: Product[], search: string, category: string): Product[] => {
   const query = search.trim().toLocaleLowerCase('fr')
   return products.filter(product => {
