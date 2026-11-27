@@ -1,21 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { SalesDataset } from '../types/sales'
-import { calculateSales, type SalesSummary } from '../services/salesCalculations'
+import { useSalesDashboard } from './salesDashboardState'
 
 const props = defineProps<{ dataset: SalesDataset }>()
 
-const calculation = computed<{ summary: SalesSummary | null; error: string | null }>(() => {
-  try {
-    return { summary: calculateSales(props.dataset), error: null }
-  } catch (reason) {
-    return {
-      summary: null,
-      error: reason instanceof Error ? reason.message : String(reason)
-    }
-  }
-})
-
+const { startDate, endDate, channel, locationId, calculation } = useSalesDashboard(() => props.dataset)
 const summary = computed(() => calculation.value.summary)
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -58,6 +48,40 @@ const monthPoints = computed(() => {
       </div>
       <p class="fiction-note"><strong>Données fictives.</strong> Ces commandes ne représentent ni paiements ni encaissements réels.</p>
     </header>
+
+    <section class="sales-filters" aria-labelledby="filters-heading">
+      <div class="filters-heading">
+        <p class="panel-index">Affiner la période et le périmètre</p>
+        <h3 id="filters-heading">Filtres</h3>
+      </div>
+      <div class="filter-controls">
+        <label>
+          <span>Date de début (incluse)</span>
+          <input v-model="startDate" type="date" aria-label="Date de début incluse">
+        </label>
+        <label>
+          <span>Date de fin (incluse)</span>
+          <input v-model="endDate" type="date" aria-label="Date de fin incluse">
+        </label>
+        <label>
+          <span>Canal</span>
+          <select v-model="channel" aria-label="Filtrer par canal">
+            <option value="">Tous les canaux</option>
+            <option value="store">Magasins</option>
+            <option value="online">Portail en ligne</option>
+          </select>
+        </label>
+        <label>
+          <span>Point de vente</span>
+          <select v-model="locationId" aria-label="Filtrer par point de vente">
+            <option value="">Tous les points de vente</option>
+            <option v-for="location in dataset.locations" :key="location.id" :value="location.id">
+              {{ location.name }} — {{ channelLabel(location.channel) }}
+            </option>
+          </select>
+        </label>
+      </div>
+    </section>
 
     <div v-if="calculation.error" class="sales-error" role="alert">
       <h3>La synthèse des ventes ne peut pas être calculée</h3>
@@ -181,6 +205,12 @@ const monthPoints = computed(() => {
 .sales-error h3 { margin: 0 0 .3rem; font-family: var(--font-display); font-size: 1.6rem; font-weight: 400; text-transform: uppercase; }
 .sales-error p { margin: 0; overflow-wrap: anywhere; }
 .empty-note { margin: 0 0 1rem; padding: .8rem 1rem; color: var(--ink); background: var(--parchment); border-left: 5px solid var(--gold-deep); font-weight: 700; }
+.sales-filters { margin: 0 0 1rem; padding: 1rem 1.2rem; color: var(--ink); background: var(--parchment); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--gold-deep); }
+.filters-heading { margin-bottom: .8rem; }
+.filters-heading h3 { margin: .15rem 0 0; font-family: var(--font-display); font-size: 1.35rem; font-weight: 400; letter-spacing: .035em; text-transform: uppercase; }
+.filter-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; }
+.filter-controls label { display: grid; align-content: start; gap: .35rem; font-size: .84rem; font-weight: 800; }
+.filter-controls input, .filter-controls select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: .55rem .65rem; color: var(--ink); background: #fffaf0; border: 2px solid var(--ink); border-radius: 3px; font: inherit; }
 .metrics { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 1rem; }
 .metric { display: flex; flex-direction: column; justify-content: center; min-height: 138px; padding: 1rem 1.2rem; color: var(--text); background: var(--steel); border: 2px solid var(--steel-3); box-shadow: 0 5px 0 rgba(0, 0, 0, .28); }
 .metric-primary { color: var(--ink); background: var(--gold); border-color: var(--ink); box-shadow: 4px 5px 0 var(--gold-deep); }
@@ -219,9 +249,11 @@ const monthPoints = computed(() => {
 @media (max-width: 760px) {
   .sales-heading { align-items: start; flex-direction: column; }
   .fiction-note { flex-basis: auto; }
+  .filter-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sales-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
+  .filter-controls { grid-template-columns: 1fr; }
   .metrics { grid-template-columns: 1fr; gap: .6rem; }
   .metric { min-height: 104px; }
   .location-list li { grid-template-columns: minmax(0, 1fr) auto; }
