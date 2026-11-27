@@ -32,8 +32,6 @@ const addCents = (a: number, b: number): number => {
   return sum
 }
 
-const toCents = (amount: number): number => Math.round(amount * 100)
-
 export const calculateSales = (
   data: Pick<SalesData, 'locations' | 'orders'>,
   filters: SalesFilters = {}
@@ -78,7 +76,7 @@ export const calculateSales = (
         || line.unitPriceCents > line.listUnitPriceCents) invalidData()
       lineIds.add(line.product.id)
     }
-    const orderTotal = toCents(orderTotalCents(order.lines))
+    const orderTotal = orderTotalCents(order.lines)
     if ((filters.startDate && order.date < filters.startDate)
       || (filters.endDate && order.date > filters.endDate)
       || (filters.channel && location.channel !== filters.channel)
@@ -101,7 +99,7 @@ export const calculateSales = (
     months.set(month, monthTotal)
     for (const line of order.lines) {
       const product = products.get(line.product.id) ?? { productId: line.product.id, name: line.product.name, totalCents: 0 }
-      product.totalCents = addCents(product.totalCents, toCents(lineTotalCents(line)))
+      product.totalCents = addCents(product.totalCents, lineTotalCents(line))
       products.set(product.productId, product)
     }
   }
