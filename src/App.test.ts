@@ -25,4 +25,15 @@ describe('storefront boundaries', () => {
     expect(entry).not.toContain('createWebHistory')
     expect(uiSources.join('\n')).not.toContain(['ch', 'art'].join(''))
   })
+
+  it('keeps the raw register and both existing storefront paths available alongside the summary', () => {
+    const app = uiSources[0]!
+    const register = uiSources[2]!
+    expect(app).toContain('activeView === \'data\' && sales')
+    expect(app).toContain('activeView === \'shop\'')
+    expect(register).toContain('SalesDashboard')
+    expect(register).toContain('Registre brut')
+    expect(register).toContain('activeSection === \'raw\'')
+    expect(register).toContain('rawJson')
+  })
 })

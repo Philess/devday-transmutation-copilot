@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { SalesDataset } from '../types/sales'
+import SalesDashboard from './SalesDashboard.vue'
 
 const props = defineProps<{ dataset: SalesDataset }>()
+const activeSection = ref<'summary' | 'raw'>('summary')
 const collections: { key: keyof SalesDataset; label: string }[] = [
   { key: 'metadata', label: 'Métadonnées' },
   { key: 'products', label: 'Catalogue' },
@@ -34,11 +36,18 @@ watch(selected, () => { page.value = 1 })
   <main class="data-view">
     <header class="view-heading">
       <p class="eyebrow">Archives · accès lecture seule</p>
-      <h1>Registre d’approvisionnement</h1>
-      <p>Consultez les données fictives brutes du projet. Les commandes historiques sont conservées dans ce navigateur.</p>
+      <h1>Registre des ventes</h1>
+      <p>Consultez la synthèse des commandes fictives ou ouvrez les collections brutes. Cette vue ne modifie pas les données enregistrées.</p>
     </header>
 
-    <section class="data-panel" aria-label="Collections de données brutes">
+    <div class="register-switch" role="group" aria-label="Contenu du registre">
+      <button type="button" :aria-pressed="activeSection === 'summary'" @click="activeSection = 'summary'">Synthèse des ventes</button>
+      <button type="button" :aria-pressed="activeSection === 'raw'" @click="activeSection = 'raw'">Registre brut</button>
+    </div>
+
+    <SalesDashboard v-if="activeSection === 'summary'" :dataset="dataset" />
+
+    <section v-else class="data-panel" aria-label="Collections de données brutes">
       <p class="data-note"><strong>Démonstration locale.</strong> Aucun paiement ni service distant n’est connecté. Les montants des lignes sont en cents USD.</p>
       <p class="date-range">Période des données : {{ dataset.metadata.startDate }} – {{ dataset.metadata.endDate }} · {{ dataset.metadata.currency }} · UTC</p>
 
@@ -63,6 +72,9 @@ watch(selected, () => { page.value = 1 })
 .eyebrow { margin: 0; color: var(--spark); font-size: 0.85rem; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; }
 h1 { margin: 0.35rem 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(2.4rem, 5vw, 4rem); line-height: .95; letter-spacing: .02em; text-transform: uppercase; }
 .view-heading p:last-child { max-width: 60ch; color: var(--muted); line-height: 1.6; }
+.register-switch { display: flex; flex-wrap: wrap; gap: .7rem; margin: 1.2rem clamp(1rem, 4vw, 2rem) 0; }
+.register-switch button { min-height: 44px; padding: .55rem 1rem; color: var(--text); background: var(--steel); border: 2px solid var(--steel-3); border-radius: 4px; font-weight: 800; }
+.register-switch button[aria-pressed='true'] { color: var(--ink); background: var(--gold); border-color: var(--ink); box-shadow: 0 3px 0 var(--gold-deep); }
 .data-panel { position: relative; box-sizing: border-box; padding: clamp(1rem, 3vw, 1.75rem); color: var(--ink); background: linear-gradient(160deg, var(--parchment), var(--parchment-2)); border: 3px solid var(--ink); border-radius: 6px; box-shadow: 0 0 0 2px var(--gold-deep), 0 14px 28px rgba(0, 0, 0, .45); }
 .data-note { margin-top: 0; padding: 0.8rem 1rem; border: 2px dashed var(--gold-deep); background: #efe2c0; line-height: 1.5; }
 .date-range { color: #3b3a35; font-weight: 600; }
