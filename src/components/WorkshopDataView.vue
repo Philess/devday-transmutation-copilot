@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { SalesDataset } from '../types/sales'
+import SalesDashboard from './SalesDashboard.vue'
 
 const props = defineProps<{ dataset: SalesDataset }>()
 const collections: { key: keyof SalesDataset; label: string }[] = [
@@ -12,6 +13,7 @@ const collections: { key: keyof SalesDataset; label: string }[] = [
   { key: 'orders', label: 'Commandes' }
 ]
 const selected = ref<keyof SalesDataset>('orders')
+const activeSection = ref<'dashboard' | 'raw'>('dashboard')
 const page = ref(1)
 const pageSize = 25
 const collection = computed<unknown>(() => props.dataset[selected.value])
@@ -33,12 +35,19 @@ watch(selected, () => { page.value = 1 })
 <template>
   <main class="data-view">
     <header class="view-heading">
-      <p class="eyebrow">Archives · accès lecture seule</p>
-      <h1>Registre d’approvisionnement</h1>
-      <p>Consultez les données fictives brutes du projet. Les commandes historiques sont conservées dans ce navigateur.</p>
+      <p class="eyebrow">Registre · commandes fictives</p>
+      <h1>Archives des ventes</h1>
+      <p>Explorez le tableau de bord ou consultez les données fictives brutes conservées dans ce navigateur.</p>
     </header>
 
-    <section class="data-panel" aria-label="Collections de données brutes">
+    <nav class="data-tabs" aria-label="Consultation du registre">
+      <button type="button" :aria-pressed="activeSection === 'dashboard'" @click="activeSection = 'dashboard'">Tableau de bord</button>
+      <button type="button" :aria-pressed="activeSection === 'raw'" @click="activeSection = 'raw'">Registre brut</button>
+    </nav>
+
+    <SalesDashboard v-if="activeSection === 'dashboard'" :dataset="dataset" />
+
+    <section v-else class="data-panel" aria-label="Collections de données brutes">
       <p class="data-note"><strong>Démonstration locale.</strong> Aucun paiement ni service distant n’est connecté. Les montants des lignes sont en cents USD.</p>
       <p class="date-range">Période des données : {{ dataset.metadata.startDate }} – {{ dataset.metadata.endDate }} · {{ dataset.metadata.currency }} · UTC</p>
 
@@ -59,6 +68,9 @@ watch(selected, () => { page.value = 1 })
 
 <style scoped>
 .data-view { min-height: 70vh; max-width: 1480px; margin: 0 auto; padding: 1rem clamp(1rem, 4vw, 2rem) 3rem; }
+.data-tabs { display: flex; gap: .65rem; margin-bottom: 1rem; }
+.data-tabs button { min-height: 44px; padding: .6rem .9rem; border: 3px solid var(--ink); border-radius: 4px; background: #c9bd9f; color: var(--ink); font: inherit; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
+.data-tabs button[aria-pressed="true"] { background: var(--crimson-deep); color: #fff; }
 .view-heading { max-width: 850px; margin: 1rem 0 1.6rem; color: var(--text); }
 .eyebrow { margin: 0; color: var(--spark); font-size: 0.85rem; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; }
 h1 { margin: 0.35rem 0; font-family: var(--font-display); font-weight: 400; font-size: clamp(2.4rem, 5vw, 4rem); line-height: .95; letter-spacing: .02em; text-transform: uppercase; }
