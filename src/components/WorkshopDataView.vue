@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { SalesDataset } from '../types/sales'
+import SalesDashboard from './SalesDashboard.vue'
 
 const props = defineProps<{ dataset: SalesDataset }>()
 const collections: { key: keyof SalesDataset; label: string }[] = [
@@ -41,6 +42,8 @@ watch(selected, () => { page.value = 1 })
     <section class="data-panel" aria-label="Collections de données brutes">
       <p class="data-note"><strong>Démonstration locale.</strong> Aucun paiement ni service distant n’est connecté. Les montants des lignes sont en cents USD.</p>
       <p class="date-range">Période des données : {{ dataset.metadata.startDate }} – {{ dataset.metadata.endDate }} · {{ dataset.metadata.currency }} · UTC</p>
+
+      <SalesDashboard :dataset="dataset" />
 
       <label for="data-collection">Collection</label>
       <select id="data-collection" v-model="selected">
