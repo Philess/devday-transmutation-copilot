@@ -38,24 +38,24 @@ describe('sales calculations', () => {
     const data = { ...sample(), products: [{ id: 1, priceCents: 99999 }] }
     const result = calculateSales(data, { startDate: '2025-03-01', endDate: '2025-03-31' })
     expect(result).toEqual({
-      totalCents: 32500, orderCount: 2, averageOrderCents: 16250,
+      totalCents: 325, orderCount: 2, averageOrderCents: 163,
       byLocation: [
-        { location: data.locations[0], totalCents: 25000, orderCount: 1 },
-        { location: data.locations[1], totalCents: 7500, orderCount: 1 }
+        { location: data.locations[0], totalCents: 250, orderCount: 1 },
+        { location: data.locations[1], totalCents: 75, orderCount: 1 }
       ],
       byChannel: [
-        { channel: 'online', totalCents: 7500, orderCount: 1 },
-        { channel: 'store', totalCents: 25000, orderCount: 1 }
+        { channel: 'online', totalCents: 75, orderCount: 1 },
+        { channel: 'store', totalCents: 250, orderCount: 1 }
       ],
       topProducts: [
-        { productId: 1, name: 'Product 1', totalCents: 27500 },
-        { productId: 2, name: 'Product 2', totalCents: 5000 }
+        { productId: 1, name: 'Product 1', totalCents: 275 },
+        { productId: 2, name: 'Product 2', totalCents: 50 }
       ],
-      byMonth: [{ month: '2025-03', totalCents: 32500, orderCount: 2 }]
+      byMonth: [{ month: '2025-03', totalCents: 325, orderCount: 2 }]
     })
     expect(calculateSales(data).byMonth).toEqual([
-      { month: '2025-03', totalCents: 32500, orderCount: 2 },
-      { month: '2025-04', totalCents: 20000, orderCount: 1 }
+      { month: '2025-03', totalCents: 325, orderCount: 2 },
+      { month: '2025-04', totalCents: 200, orderCount: 1 }
     ])
   })
 
